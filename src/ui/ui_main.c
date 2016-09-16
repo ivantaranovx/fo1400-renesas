@@ -17,6 +17,7 @@ char tz_state_char(uint8_t ch);
 unsigned is_changed(int val, int *store);
 void clear_store();
 
+/* +lcdconv */
 static const char  msg_mode_adj[]          = "Налад.";
 static const char  msg_mode_hand[]         = "Ручн. ";
 static const char  msg_mode_half[]         = "П/авт.";
@@ -42,6 +43,7 @@ static const char  msg_load[]              = "Загрузка";
 static const char  msg_decompression[]     = "Декомпрессия";
 static const char  msg_disjunction[]       = "Размыкание";
 static const char  msg_not_warmed[]        = "Не разогрет МЦ";
+/* -lcdconv */
 
 static const char  str_temp[]              = "% 4i % 4i % 4i % 4i % 4i";
 

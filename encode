@@ -1,0 +1,23 @@
+#!/bin/sh
+
+SRCDIR=src
+DSTDIR=esrc
+
+FILES=`find $SRCDIR | sed "s/$SRCDIR//"`
+
+mkdir -p $DSTDIR
+
+for i in $FILES
+do
+    SRC=$SRCDIR$i
+    DST=$DSTDIR$i
+
+    if [ -d "$SRC" ]; then
+	mkdir -p $DST
+    fi
+
+    if [ -f "$SRC" ]; then
+	/usr/local/bin/enc2lcd utf-8 $SRC>$DST
+    fi
+done
+

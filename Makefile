@@ -1,7 +1,9 @@
 
-SRC = m30845.c thermo.c dio.c lcd.c 24lc512.c helper.c workset.c fo1400.c ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c
+SRC = m30845.c thermo.c dio.c lcd.c 24lc512.c helper.c workset.c fo1400.c \
+    ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c
+
 TARGET = fo1400
-SRCDIR = src
+SRCDIR = esrc
 BUILDDIR = build
 
 CC = wine "c:\m32c-elf\bin\m32c-elf-gcc.exe"
@@ -23,10 +25,11 @@ $(TARGET): $(OBJS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	@rm -f $(OBJS)
-	@rm -rf $(BUILDDIR)
+	@rm -f $(BUILDDIR)/$(TARGET).elf
+	@rm -f $(BUILDDIR)/$(TARGET).map
 	@rm -f $(TARGET).mot
 
