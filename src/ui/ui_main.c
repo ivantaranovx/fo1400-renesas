@@ -267,8 +267,8 @@ void clear_store()
 {
     memset(tz_state, 0, TZ_MAX);
     tz_int = 0;
-    main_mode = 0;
-    main_oper = 0;
+    main_mode = -1;
+    main_oper = -1;
     main_flags.v = 0;
 }
 
