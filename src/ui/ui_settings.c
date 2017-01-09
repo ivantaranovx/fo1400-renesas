@@ -11,9 +11,9 @@
 
 typedef struct
 {
-    char *name;
-    char *unit1;
-    char *unit2;
+    const char *name;
+    const char *unit1;
+    const char *unit2;
 }
 UNIT_PARAM;
 
@@ -22,6 +22,8 @@ const uint8_t main_menu[] =
 {
     7, 11, 19, 16, 5, 5, 5, 3
 };
+
+/* +lcdconv */
 
 static const UNIT_PARAM main_menu_items[] =
 {
@@ -104,6 +106,11 @@ static const UNIT_PARAM main_menu_items[] =
     {"конец 2 ст. впрыска",		"", 0},
     {"Формование выс.",			"", 0}
 };
+
+const char str_from[] = "от";
+const char str_to[]   = "до";
+
+/* -lcdconv */
 
 WORKSET *workset;
 static uint8_t menu = 1;
@@ -220,36 +227,36 @@ int ui_settings(char key)
     }
 
     lcd_clear();
-    lcd_print(STR1_ADDR, main_menu_items[menu - 1].name);
+    lcd_print_rom(STR1_ADDR, main_menu_items[menu - 1].name);
 
     i = get_idx(menu, submenu);	// index of parameter
     j = main_menu[0] + i;	// index of parameter name
-    lcd_print(STR2_ADDR + 1, main_menu_items[j].name);
+    lcd_print_rom(STR2_ADDR + 1, main_menu_items[j].name);
 
     cval = get_param(i);
     get_param_limits(i, &cmin, &cmax);
 
     if ((cmin == 0) && (cmax == 1))
     {
-        lcd_print(STR3_ADDR + 2, (cval == 0) ? main_menu_items[j].unit1 : main_menu_items[j].unit2);
+        lcd_print_rom(STR3_ADDR + 2, (cval == 0) ? main_menu_items[j].unit1 : main_menu_items[j].unit2);
     }
     else
     {
         if (menu == 2) // dot in param
         {
             lcd_uint(STR3_ADDR + 2, cval, 4);
-            lcd_print(STR3_ADDR + 9, main_menu_items[j].unit1);
+            lcd_print_rom(STR3_ADDR + 9, main_menu_items[j].unit1);
         }
         else
         {
             lcd_uint(STR3_ADDR + 2, cval, 0);
-            lcd_print(STR3_ADDR + 8, main_menu_items[j].unit1);
+            lcd_print_rom(STR3_ADDR + 8, main_menu_items[j].unit1);
         }
     }
 
-    lcd_print(STR4_ADDR + 0, "от");
+    lcd_print_rom(STR4_ADDR + 0, str_from);
     lcd_uint(STR4_ADDR + 3, cmin, (menu == 2) ? 4 : 0);
-    lcd_print(STR4_ADDR + 10, "до");
+    lcd_print_rom(STR4_ADDR + 10, str_to);
     lcd_uint(STR4_ADDR + 13, cmax, (menu == 2) ? 4 : 0);
 
     return 0;

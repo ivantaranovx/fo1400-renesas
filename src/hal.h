@@ -7,6 +7,7 @@ typedef enum
     TMR_SYS = 0,
     TMR_ENGINE,
     TMR_LUB,
+    TMR_UI,
 
     TMR_1,
     TMR_2,

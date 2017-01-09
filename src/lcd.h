@@ -24,13 +24,13 @@ unsigned lcd_clear(void);
 unsigned lcd_clr_str(uint8_t pos);
 
 unsigned lcd_set_cursor(uint8_t pos, unsigned show);
-unsigned lcd_put_char(uint8_t c);
+unsigned lcd_put_char(char c);
 
 /*
- * print buffer (ANSI)
+ * print buffer ()
  */
-unsigned lcd_print_rom(uint8_t pos, const char *buf);
 unsigned lcd_print(uint8_t pos, char *buf);
+unsigned lcd_print_rom(uint8_t pos, const char *buf);
 
 #endif	/* LCD_H */
 

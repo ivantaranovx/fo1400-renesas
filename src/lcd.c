@@ -60,16 +60,17 @@ unsigned lcd_set_cursor(uint8_t pos, unsigned show)
     return 0;
 }
 
-unsigned lcd_put_char(uint8_t c)
+unsigned lcd_put_char(char c)
 {
     _lcd_set_rs(1);
-    _lcd_write(c);
+    _lcd_write((uint8_t)c);
     if (_lcd_busy()) return 1;
     return 0;
 }
 
 unsigned lcd_print(uint8_t pos, char *buf)
 {
+    if (buf == 0) return 1;
     if (lcd_set_cursor(pos, 0)) return 1;
     while(*buf)
     {
@@ -81,6 +82,7 @@ unsigned lcd_print(uint8_t pos, char *buf)
 
 unsigned lcd_print_rom(uint8_t pos, const char *buf)
 {
+    if (buf == 0) return 1;
     return lcd_print(pos, (char*)buf);
 }
 

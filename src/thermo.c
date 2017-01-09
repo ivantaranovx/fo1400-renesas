@@ -77,7 +77,10 @@ uint16_t thermo_get_int_temp(void)
     double u = 0;
     double t = 0;
     double adc = _get_adc_u(0);
+    static uint16_t result = 0;
+
     if (adc == 0) return 0;
+
     // среднее по таблице
     for(i = 0;;i += 2)
     {
@@ -88,7 +91,12 @@ uint16_t thermo_get_int_temp(void)
     }
     adc -= u;
     u = adc / (thermo_res[i] - u);
-    return (uint16_t)round(t + ((thermo_res[i + 1] - t) * u));
+    t = t + ((thermo_res[i + 1] - t) * u);
+    //
+
+    t = modf(t, &u) * 10;
+    if ((t > 0) & (t < 9)) result = u;
+    return result;
 }
 
 void thermo_heat_enable(unsigned e)

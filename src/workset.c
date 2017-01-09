@@ -109,7 +109,6 @@ unsigned workset_load(uint8_t num, WORKSET *set)
 
     if (readArray(i, (uint8_t*)set, sizeof(WORKSET)) != sizeof(WORKSET)) memset(set, 0xFF, sizeof(WORKSET));
 
-    if (set->prod_name[0] < 0xFF) return 0;
     for(i = 0; i < WORKSET_PARAM_COUNT; i++) check_param(i, ptr++);
     return 0;
 }

@@ -471,8 +471,10 @@ void _bus_write(uint8_t addr, uint16_t data)
 
 uint16_t _bus_read(uint8_t addr)
 {
-    unsigned int r;
+    uint16_t r;
+
     BUS_ADDR = addr & 0x1F;
+    _delay_us(2);
     BUS_RD = 1;
     _delay_us(2);
     r = BUS_HI;
@@ -510,7 +512,7 @@ unsigned _lcd_busy(void)
 {
     WH_RS = 0;
     _delay_us(1);
-    for (int tmp = 255; tmp > 0; tmp--)
+    for (int tmp = 500; tmp > 0; tmp--)
     {
         WH_OE = 1;
         _delay_us(1);
