@@ -102,6 +102,90 @@ int main(void) {
     }
 }
 
+int check_heat(void) {
+
+    if (f_heat_ok) return 0;
+    SET_ERROR(e_not_warmed);
+    NEXT_OPER(o_idle);
+    return 1;
+}
+
+MAIN_STATE *main_get_state(void) {
+
+    return &state;
+}
+
+void all_em_off(void) {
+
+    EM18(OFF);
+    EM29(OFF);
+    EM16(OFF);
+    EM1(OFF);
+    EM31(OFF);
+    EM13(OFF);
+    EM30(OFF);
+    EM4(OFF);
+
+    EM3(OFF);
+    EM6(OFF);
+    EM5(OFF);
+    EM12(OFF);
+    EM7(OFF);
+    EM2(OFF);
+    EM40(OFF);
+    EM41(OFF);
+}
+
+void set_hydro(uint16_t speed) {
+
+    double dac = speed;
+    dac /= 9.8039;
+    if (dac > 255) dac = 255;
+    _set_dac(0, (uint8_t)round(dac));
+}
+
+void check_mode_selector(void)
+{
+    int j = 0;
+    int i = m_unknown;
+
+    if (M_ADJUST) {
+        i = m_adjust;
+        j++;
+    }
+    if (M_MANUAL) {
+        i = m_manual;
+        j++;
+    }
+    if (M_SEMI_AUTO) {
+        i = m_semi;
+        j++;
+    }
+    if (M_AUTO) {
+        i = m_auto;
+        j++;
+    }
+    if (j > 1) return;
+    if (i == state.mode) return;
+    state.mode = i;
+    guard_state = 0;
+    f_cycle_stop = 1;
+}
+
+void check_guard(void)
+{
+    if (!BK56 && !BK57 && (guard_state == 0)) guard_state = 1;
+    if (!BK56 && BK57 && (guard_state == 1)) guard_state = 2;
+    if (guard_state < 3) return;
+    if (BK56 && BK57)
+    {
+        if (guard_state == 2) guard_state = 3;
+        return;
+    }
+    guard_state = 0;
+    NEXT_OPER(o_guard_stop);
+}
+
 void engine_task(void) {
 
     static int engine_state = 0;
@@ -447,88 +531,4 @@ void main_task(void) {
             break;
     }
 
-}
-
-int check_heat(void) {
-
-    if (f_heat_ok) return 0;
-    SET_ERROR(e_not_warmed);
-    NEXT_OPER(o_idle);
-    return 1;
-}
-
-MAIN_STATE *main_get_state(void) {
-
-    return &state;
-}
-
-void all_em_off(void) {
-
-    EM18(OFF);
-    EM29(OFF);
-    EM16(OFF);
-    EM1(OFF);
-    EM31(OFF);
-    EM13(OFF);
-    EM30(OFF);
-    EM4(OFF);
-
-    EM3(OFF);
-    EM6(OFF);
-    EM5(OFF);
-    EM12(OFF);
-    EM7(OFF);
-    EM2(OFF);
-    EM40(OFF);
-    EM41(OFF);
-}
-
-void set_hydro(uint16_t speed) {
-
-    double dac = speed;
-    dac /= 9.8039;
-    if (dac > 255) dac = 255;
-    _set_dac(0, (uint8_t)round(dac));
-}
-
-void check_mode_selector(void)
-{
-    int j = 0;
-    int i = m_unknown;
-
-    if (M_ADJUST) {
-        i = m_adjust;
-        j++;
-    }
-    if (M_MANUAL) {
-        i = m_manual;
-        j++;
-    }
-    if (M_SEMI_AUTO) {
-        i = m_semi;
-        j++;
-    }
-    if (M_AUTO) {
-        i = m_auto;
-        j++;
-    }
-    if (j > 1) return;
-    if (i == state.mode) return;
-    state.mode = i;
-    guard_state = 0;
-    f_cycle_stop = 1;
-}
-
-void check_guard(void)
-{
-    if (!BK56 && !BK57 && (guard_state == 0)) guard_state = 1;
-    if (!BK56 && BK57 && (guard_state == 1)) guard_state = 2;
-    if (guard_state < 3) return;
-    if (BK56 && BK57)
-    {
-        if (guard_state == 2) guard_state = 3;
-        return;
-    }
-    guard_state = 0;
-    NEXT_OPER(o_guard_stop);
 }
