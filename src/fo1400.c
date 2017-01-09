@@ -90,21 +90,15 @@ int main(void) {
         main_task();
         thermo_task();
         engine_task();
+        lub_task();
 
         f_heat_ok = thermo_heat_ok();
         f_power_on = KM1;
         f_guard_ok = (guard_state == 3);
         f_engine_on = ENGINE_STATE;
 
-        lub_task();
-
-        if (get_timer(TMR_UI) <= 0)
-        {
-            set_timer(TMR_UI, 100);
-            ui_task();
-        }
-
         dio_task();
+        ui_task();
     }
 }
 

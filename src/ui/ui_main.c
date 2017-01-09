@@ -117,7 +117,12 @@ void ui_task(void) {
 
     int i, j;
     MAIN_STATE *state;
-    uint8_t key = get_key();
+    uint8_t key;
+
+    if (get_timer(TMR_UI) > 0) return;
+    set_timer(TMR_UI, 100);
+
+    key = get_key();
 
     switch (screen) {
 
