@@ -1,41 +1,44 @@
 
+#include <stdarg.h>
+#include <stdio.h>
+
 #include "hal.h"
 #include "lcd.h"
 #include "helper.h"
 
 unsigned lcd_init(void)
 {
-    _lcd_write(0x30);
+    lcd_write(0x30);
     _delay_us(2000);
-    _lcd_write(0x30);
+    lcd_write(0x30);
     _delay_us(2000);
-    _lcd_write(0x30);
+    lcd_write(0x30);
     _delay_us(150);
-    _lcd_write(0x30);
+    lcd_write(0x30);
     _delay_us(50);
-    _lcd_write(0x20);
+    lcd_write(0x20);
     _delay_us(50);
 
-    if (_lcd_busy()) return 0;
-    _lcd_write(0x20);
-    if (_lcd_busy()) return 0;
-    _lcd_write(0x2C);
-    if (_lcd_busy()) return 0;
-    _lcd_write(0x0C);
-    if (_lcd_busy()) return 0;
-    _lcd_write(0x06);
-    if (_lcd_busy()) return 0;
-    _lcd_write(0x01);
-    if (_lcd_busy()) return 0;
+    if (lcd_busy()) return 0;
+    lcd_write(0x20);
+    if (lcd_busy()) return 0;
+    lcd_write(0x2C);
+    if (lcd_busy()) return 0;
+    lcd_write(0x0C);
+    if (lcd_busy()) return 0;
+    lcd_write(0x06);
+    if (lcd_busy()) return 0;
+    lcd_write(0x01);
+    if (lcd_busy()) return 0;
 
     return 1;
 }
 
 unsigned lcd_clear(void)
 {
-    _lcd_set_rs(0);
-    _lcd_write(0x01);
-    if (_lcd_busy()) return 1;
+    lcd_set_rs(0);
+    lcd_write(0x01);
+    if (lcd_busy()) return 1;
     return 0;
 }
 
@@ -52,19 +55,19 @@ unsigned lcd_clr_str(uint8_t pos)
 
 unsigned lcd_set_cursor(uint8_t pos, unsigned show)
 {
-    _lcd_set_rs(0);
-    if (show) _lcd_write(0x0E); else _lcd_write(0x0C);
-    if (_lcd_busy()) return 1;
-    _lcd_write(0x80 | pos);
-    if (_lcd_busy()) return 1;
+    lcd_set_rs(0);
+    if (show) lcd_write(0x0E); else lcd_write(0x0C);
+    if (lcd_busy()) return 1;
+    lcd_write(0x80 | pos);
+    if (lcd_busy()) return 1;
     return 0;
 }
 
 unsigned lcd_put_char(char c)
 {
-    _lcd_set_rs(1);
-    _lcd_write((uint8_t)c);
-    if (_lcd_busy()) return 1;
+    lcd_set_rs(1);
+    lcd_write((uint8_t)c);
+    if (lcd_busy()) return 1;
     return 0;
 }
 
@@ -86,3 +89,14 @@ unsigned lcd_print_rom(uint8_t pos, const char *buf)
     return lcd_print(pos, (char*)buf);
 }
 
+void lcd_printf(unsigned char pos, const char *fmt, ...) {
+
+    va_list args;
+    char buf[STR_MAX_LENGTH + 1];
+
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof (buf), fmt, args);
+    va_end(args);
+
+    lcd_print(pos, buf);
+}

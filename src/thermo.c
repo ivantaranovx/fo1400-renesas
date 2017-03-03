@@ -22,12 +22,12 @@ typedef struct
 }
 FLAGS;
 
+extern WORKSET workset; // GLOBAL!
+
 static FLAGS flags;
 
 static uint16_t tz_current[TZ_MAX] = {0};
 static uint16_t tz_pwm[TZ_MAX] = {0};
-
-static WORKSET *workset;
 
 const double thermo_res[] =
 {
@@ -51,32 +51,12 @@ const double thermo_res[] =
     0, 0
 };
 
-void thermo_set_workset(WORKSET *set)
-{
-    workset = set;
-}
-
-uint16_t thermo_get_tz_temp(uint8_t ch)
-{
-    if (ch >= TZ_MAX) return 0;
-    return tz_current[ch];
-}
-
-char thermo_get_tz_state(uint8_t ch)
-{
-    uint16_t *temp_z = &workset->temp_Z1;
-    if (ch >= TZ_MAX) return -1;
-    if (tz_current[ch] > temp_z[ch]) return 1;
-    if (tz_current[ch] < temp_z[ch]) return -1;
-    return 0;
-}
-
 uint16_t thermo_get_int_temp(void)
 {
     int i;
     double u = 0;
     double t = 0;
-    double adc = _get_adc_u(0);
+    double adc = adc_get_u(0);
     static uint16_t result = 0;
 
     if (adc == 0) return 0;
@@ -102,7 +82,11 @@ uint16_t thermo_get_int_temp(void)
 void thermo_heat_enable(unsigned e)
 {
     int i;
-    if (!e)
+    if (e)
+    {
+        clr_scale_timer(TMR_SCALE_TPWM);
+    }
+    else
     {
         for (i = 0; i < TZ_MAX; i++) dio_out(thermo_zones[i], 0);
         dio_flush();
@@ -111,55 +95,61 @@ void thermo_heat_enable(unsigned e)
     flags.f_heat_on = e;
 }
 
-unsigned thermo_heat_enabled(void)
-{
-    return flags.f_heat_on;
-}
-
 unsigned thermo_heat_ok(void)
 {
     return flags.f_heat_ok;
 }
 
+uint16_t thermo_get_tz_temp(uint8_t ch)
+{
+    if (ch >= TZ_MAX) return 0;
+    return tz_current[ch];
+}
+
 void thermo_task(void)
 {
     uint16_t tmr;
-    uint16_t *temp_z = &workset->temp_Z1;
-    uint16_t *pwm_z = &workset->pwm_Z1;
+    uint16_t *temp_z = &workset.temp_Z1;
+    uint16_t *pwm_z = &workset.pwm_Z1;
     double c_temp;
     int i;
 
     tmr = get_scale_timer(TMR_SCALE_TPWM);
-    if (tmr >= PWM_PERIOD)
+
+    if (tmr < PWM_PERIOD)
     {
-        clr_scale_timer(TMR_SCALE_TPWM);
         for (i = 0; i < TZ_MAX; i++)
         {
-            c_temp = _get_adc_u(i + 1);
-            if (c_temp > 4.85) c_temp = 4.85;
-            if (c_temp < 0.095) c_temp = 0.095;
-            c_temp = ((4.85 - c_temp) * 102);
-            tz_current[i] = (uint16_t)round(c_temp);
-
-            if ((tz_current[i] < *temp_z) && flags.f_heat_on)
-                tz_pwm[i] = (*pwm_z) * PWM_PULSE;
-            else
-                tz_pwm[i] = 0;
-
-            flags.f_heat_ok = 1;
-            if (tz_current[i] < (*temp_z - workset->temp_under)) flags.f_heat_ok = 0;
-            if (tz_current[i] > (*temp_z + workset->temp_over)) flags.f_heat_ok = 0;
-
-            temp_z++;
-            pwm_z++;
-
-            if (tz_pwm[i] > 0) dio_out(thermo_zones[i], 1);
+            if (tmr < tz_pwm[i]) continue;
+            dio_out(thermo_zones[i], 0);
         }
-        tmr = PWM_PERIOD;
+        dio_flush();
+        return;
     }
+
+    clr_scale_timer(TMR_SCALE_TPWM);
+
     for (i = 0; i < TZ_MAX; i++)
     {
-        if (tmr > tz_pwm[i]) dio_out(thermo_zones[i], 0);
+        c_temp = adc_get_u(i + 1);
+        if (c_temp > 4.85) c_temp = 4.85;
+        if (c_temp < 0.095) c_temp = 0.095;
+        c_temp = ((4.85 - c_temp) * 102);
+        tz_current[i] = (uint16_t)round(c_temp);
+
+        if ((tz_current[i] < *temp_z) && flags.f_heat_on)
+            tz_pwm[i] = (*pwm_z) * PWM_PULSE;
+        else
+            tz_pwm[i] = 0;
+
+        flags.f_heat_ok = 1;
+        if (tz_current[i] < (*temp_z - workset.temp_under)) flags.f_heat_ok = 0;
+        if (tz_current[i] > (*temp_z + workset.temp_over)) flags.f_heat_ok = 0;
+
+        temp_z++;
+        pwm_z++;
+
+        if (tz_pwm[i] > 0) dio_out(thermo_zones[i], 1);
+        dio_flush();
     }
-    dio_flush();
 }

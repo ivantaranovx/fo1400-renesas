@@ -5,15 +5,14 @@
 #include "hal.h"
 #include "lcd.h"
 
-typedef struct
-{
+typedef struct {
     char key;
     char aKey;
     char bKey;
 }
 ABKEYS;
 
-static ABKEYS abkeys[] ={
+static ABKEYS abkeys[] = {
     {'1', '0', '9'},
     {'2', 'A', 'C'},
     {'3', 'D', 'F'},
@@ -28,11 +27,9 @@ static ABKEYS abkeys[] ={
     {0, 0, 0}
 };
 
-void set_char(char key, char *str)
-{
+void set_char(char key, char *str) {
     uint8_t i = 0;
-    for (;;)
-    {
+    for (;;) {
         if (abkeys[i].key == 0) return;
         if (abkeys[i].key == key) break;
         i++;
@@ -42,24 +39,15 @@ void set_char(char key, char *str)
     if (*str > abkeys[i].bKey) *str = abkeys[i].aKey;
 }
 
-void print_name(uint8_t idx, char *name)
-{
-    char buf[21];
-    memset(buf, 0x20, 20);
-    buf[0] = (idx / 10) + 0x30;
-    buf[1] = (idx % 10) + 0x30;
-    buf[2] = ':';
-    buf[20] = 0;
+void print_name(uint8_t idx, char *name) {
+    lcd_clr_str(STR2_ADDR);
     if (*name)
-        strncpy(&buf[3], name, 16);
+        lcd_printf(STR2_ADDR, "%02d:%s", idx, name);
     else
-        strcpy(&buf[3], "---");
-	lcd_clr_str(STR2_ADDR);
-    lcd_print(STR2_ADDR, buf);
+        lcd_printf(STR2_ADDR, "%02d:---", idx);
 }
 
-void utoa(uint16_t val, char *buf, uint8_t pdot)
-{
+void utoa(uint16_t val, char *buf, uint8_t pdot) {
     uint8_t i;
 
     buf[0] = (val / 10000) + 0x30;
@@ -72,37 +60,40 @@ void utoa(uint16_t val, char *buf, uint8_t pdot)
     val %= 10;
     buf[4] = val + 0x30;
     buf[5] = 0;
-    if (pdot > 0)
-    {
+    if (pdot > 0) {
         pdot--;
         for (i = 6; i > pdot; i--) buf[i] = buf[i - 1];
         buf[pdot] = '.';
     }
 }
 
-char b2h(uint8_t val)
-{
+char b2h(uint8_t val) {
     if (val < 10) return val + 48;
     return val + 55;
 }
 
-void hex(uint8_t val, char *buf)
-{
+void hex(uint8_t val, char *buf) {
     buf[0] = b2h(val >> 4);
     buf[1] = b2h(val & 0x0F);
     buf[2] = 0;
 }
 
-void uart_uint(uint16_t val)
-{
+void uart_uint(uint16_t val) {
     char buf[10];
     utoa(val, buf, 0);
-    uart_send_str(buf);
+    uart_print(buf);
 }
 
-unsigned lcd_uint(uint8_t pos, uint16_t val, uint8_t c)
-{
+unsigned lcd_uint(uint8_t pos, uint16_t val, uint8_t c) {
     char buf[10];
     utoa(val, buf, c);
     return lcd_print(pos, buf);
 }
+
+bool check_int(int val, int *store)
+{
+    if (val == *store) return false;
+    *store = val;
+    return true;
+}
+

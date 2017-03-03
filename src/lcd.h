@@ -32,5 +32,7 @@ unsigned lcd_put_char(char c);
 unsigned lcd_print(uint8_t pos, char *buf);
 unsigned lcd_print_rom(uint8_t pos, const char *buf);
 
+void lcd_printf(unsigned char pos, const char *fmt, ...);
+
 #endif	/* LCD_H */
 

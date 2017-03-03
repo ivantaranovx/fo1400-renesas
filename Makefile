@@ -1,6 +1,7 @@
 
-SRC = m30845.c thermo.c dio.c lcd.c 24lc512.c helper.c workset.c fo1400.c \
-    ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c
+SRC = m30845.c thermo.c dio.c lcd.c eeprom.c helper.c workset.c fo1400.c \
+    ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c \
+    eth/enc28j60.c eth/tcpip.c
 
 TARGET = fo1400
 SRCDIR = esrc

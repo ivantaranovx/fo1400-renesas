@@ -1,13 +1,16 @@
 
 #ifndef M30845_H
-#define	M30845_H
+#define M30845_H
 
-typedef enum
-{
+typedef enum {
     TMR_SYS = 0,
     TMR_ENGINE,
     TMR_LUB,
+    TMR_GUARD,
     TMR_UI,
+
+    TMR_TCP,
+    TMR_EEPROM,
 
     TMR_1,
     TMR_2,
@@ -33,8 +36,7 @@ typedef enum
 }
 TMR_NUM;
 
-typedef enum
-{
+typedef enum {
     TMR_SCALE_INJECT,
     TMR_SCALE_TPWM,
 
@@ -88,24 +90,29 @@ void set_timer(TMR_NUM num, uint16_t delay);
  */
 int8_t get_timer(TMR_NUM num);
 
+/*
+ * stop timer
+ */
+void rst_timer(TMR_NUM num);
+
 void clr_scale_timer(TMR_SCALE_NUM num);
 uint16_t get_scale_timer(TMR_SCALE_NUM num);
 
 /*
  * return AD value for selected channel (0-7)
  */
-double _get_adc_u(uint8_t ch);
+double adc_get_u(uint8_t ch);
 
 /*
  * set DA value for selected channel (0-1)
  */
-void _set_dac(uint8_t ch, uint8_t val);
+void dac_set(uint8_t ch, uint8_t val);
 
 /*
  * return keys scan code
  * each bit is one key
  */
-uint16_t getKeyCode(void);
+uint16_t get_key_code(void);
 
 /*
  * return key code
@@ -115,31 +122,53 @@ char get_key(void);
 /*
  * system bus
  */
-void _bus_enable(unsigned e);
-void _bus_write(uint8_t addr, uint16_t data);
-uint16_t _bus_read(uint8_t addr);
+void bus_enable(unsigned e);
+void bus_write(uint8_t addr, uint16_t data);
+uint16_t bus_read(uint8_t addr);
 
 /*
  * I2C functions
  */
-void i2c_start(void);
-void i2c_rstart(void);
-void i2c_stop(void);
 
-unsigned i2c_send(uint8_t b);
-uint8_t i2c_recv(unsigned ack);
+/*
+ * void i2c_io(uint8_t addr, uint8_t *buf, uint16_t len, uint8_t flags);
+ * if rw = 0 then wite mode:
+ * start/restart, write addr and write len bytes from buf to slave, stop;
+ * if rw = 1 then read mode:
+ * start/restart, write addr and read len bytes from slave to buf, stop;
+ * flags:
+ * 1 - don`t stop; if fail then stop;
+ */
+void i2c_io(uint8_t addr, uint8_t *buf, uint16_t len, uint8_t flags);
+
+/*
+ * int i2c_io_status(void);
+ * -1 if io in progress;
+ * 0 if done and fail;
+ * 1 if done and success;
+ */
+int i2c_io_status(void);
 
 /*
  * UART functions
  */
-void uart_send_str(char *buf);
+void uart_print(char *buf);
+void uart_printf(const char *fmt, ...);
 
 /*
  * LCD functions
  */
-void _lcd_write(uint8_t v);
-unsigned _lcd_busy(void);
-void _lcd_set_rs(unsigned v);
+void lcd_write(uint8_t v);
+unsigned lcd_busy(void);
+void lcd_set_rs(unsigned v);
+
+/*
+ * SPI, ENC finctions
+ */
+void spi_select(unsigned val);
+uint8_t spi_io(uint8_t b);
+unsigned spi_enc_int(void);
+void spi_enc_rst(unsigned val);
 
 #endif /* M30845_H */
 

@@ -2,17 +2,17 @@
 #include <string.h>
 
 #include "workset.h"
-#include "24lc512.h"
+#include "eeprom.h"
 
-typedef struct
-{
-    uint16_t    min;
-    uint16_t    max;
+#define USERS_MEM_OFFSET    ((WORKSET_NAME_LENGTH + sizeof (WORKSET)) * WORKSET_COUNT)
+
+typedef struct {
+    uint16_t min;
+    uint16_t max;
 }
 WORKSET_LIM;
 
-static const WORKSET_LIM workset_lim[] =
-{
+static const WORKSET_LIM workset_lim[] = {
     {1, 0xFFFF},
     {0, 1},
     {1, 200},
@@ -85,53 +85,50 @@ static const WORKSET_LIM workset_lim[] =
     {0, 0}
 };
 
-void get_param_limits(uint8_t num, uint16_t *min, uint16_t *max)
-{
-    if (num > WORKSET_PARAM_COUNT) return;
-    *min = workset_lim[num].min;
-    *max = workset_lim[num].max;
+WORKSET workset; // GLOBAL!
+
+void get_param_limits(uint8_t idx, uint16_t *min, uint16_t *max) {
+
+    if (idx > WORKSET_PARAM_COUNT) return;
+    *min = workset_lim[idx].min;
+    *max = workset_lim[idx].max;
 }
 
-void check_param(uint8_t num, uint16_t *param)
-{
-    if (num > WORKSET_PARAM_COUNT) return;
-    if ((*param < workset_lim[num].min) || (*param > workset_lim[num].max))
-        *param = workset_lim[num].min;
+void set_param(uint8_t idx, uint16_t val) {
+    if (idx > WORKSET_PARAM_COUNT) return;
+    uint16_t *ws = (uint16_t *) & workset;
+    ws[idx] = val;
 }
 
-unsigned workset_load(uint8_t num, WORKSET *set)
-{
-    uint16_t *ptr = &set->prod_count;
-    int i = num;
-    if (num > WORKSET_PARAM_COUNT) return 1;
-    i *= sizeof(WORKSET);
-    i += ADDR_WORKSET;
+void trim_name(char *name, int length) {
 
-    if (readArray(i, (uint8_t*)set, sizeof(WORKSET)) != sizeof(WORKSET)) memset(set, 0xFF, sizeof(WORKSET));
-
-    for(i = 0; i < WORKSET_PARAM_COUNT; i++) check_param(i, ptr++);
-    return 0;
-}
-
-unsigned workset_save(uint8_t num, WORKSET *set)
-{
-    uint16_t dst = num;
-    uint8_t *src = (uint8_t*)set;
-    uint16_t len = sizeof(WORKSET);
-    uint8_t l;
-    uint8_t i;
-    if (num > WORKSET_PARAM_COUNT) return 0;
-    dst *= sizeof(WORKSET);
-    dst += ADDR_WORKSET;
-    while (len)
-    {
-        if (len > 128) l = 128; else l = len;
-        for(i = 0; i < 20; i++) if (writeArray(dst, src, l) == l) break;
-        if (i == 20) return 0;
-        src += l;
-        dst += l;
-        len -= l;
+    int i = 0;
+    for (; i < length; i++) {
+        if ((name[i] < 0x20) || (name[i] > 0x7F)) break;
     }
-    return 1;
+    for (; i < length; i++) {
+        name[i] = 0x20;
+    }
 }
 
+int get_workset_name_addr(uint8_t num) {
+
+    int addr = WORKSET_NAME_LENGTH + sizeof (WORKSET);
+    addr *= num;
+    return addr;
+}
+
+int get_workset_addr(uint8_t num) {
+
+    int addr = WORKSET_NAME_LENGTH + sizeof (WORKSET);
+    addr *= num;
+    return addr + WORKSET_NAME_LENGTH;
+}
+
+int get_user_name_addr(uint8_t num) {
+
+    int addr = USER_NAME_LENGTH;
+    addr *= num;
+    addr += USERS_MEM_OFFSET;
+    return addr;
+}

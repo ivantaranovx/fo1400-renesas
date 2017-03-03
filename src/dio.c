@@ -25,7 +25,7 @@ void dio_init(void) {
     for (i = 0; i < OUT_WORDS; i++) out_data[i] = 0;
     f_out_data_changed = 0xFFFF;
     dio_flush();
-    _bus_enable(1);
+    bus_enable(1);
     for (i = 0; i < INPUTS_MAX; i++) inputs[i].count = 0;
     for (;;) {
         dio_task();
@@ -41,7 +41,7 @@ void dio_task(void) {
     dio_flush();
     n = 0;
     for (i = 0; i < IN_WORDS; i++) {
-        data = _bus_read(IN_BASE_ADDR + i);
+        data = bus_read(IN_BASE_ADDR + i);
         for (j = 0; j < 16; j++, n++, data >>= 1) {
             unsigned in = (data & 1);
             if (in != inputs[n].current) inputs[n].count = 0;
@@ -66,9 +66,11 @@ void dio_out(uint8_t num, unsigned v) {
             out_data[num] ^= mask;
             break;
         case 1:
+            if ((out_data[num] & mask) > 0) return;
             out_data[num] |= mask;
             break;
         default:
+            if ((out_data[num] & mask) == 0) return;
             mask ^= 0xFFFF;
             out_data[num] &= mask;
             break;
@@ -87,7 +89,7 @@ void dio_flush(void) {
     if (!f_out_data_changed) return;
     for (i = 0; i < OUT_WORDS; i++) {
         if (f_out_data_changed & 1)
-            _bus_write(OUT_BASE_ADDR + i, out_data[i]);
+            bus_write(OUT_BASE_ADDR + i, out_data[i]);
         f_out_data_changed >>= 1;
     }
     f_out_data_changed = 0;

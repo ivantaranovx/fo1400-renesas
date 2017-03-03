@@ -4,12 +4,15 @@
 
 #include <stdint.h>
 
-#define prod_name_sz    16
+#define WORKSET_NAME_LENGTH     16
+#define WORKSET_PARAM_COUNT     64
+#define WORKSET_COUNT           100
+
+#define USER_NAME_LENGTH        16
+#define USER_COUNT              100
 
 typedef struct
 {
-    char        prod_name[prod_name_sz];
-
     uint16_t    prod_count;		// 0
     uint16_t    nozzle_out;		// 1
     uint16_t    pause;			// 2
@@ -83,14 +86,15 @@ typedef struct
 }
 WORKSET;
 
-#define WORKSET_PARAM_COUNT	64
-#define ADDR_WORKSET            0x0000
+void get_param_limits(uint8_t idx, uint16_t *min, uint16_t *max);
 
-void get_param_limits(uint8_t num, uint16_t *min, uint16_t *max);
-void check_param(uint8_t num, uint16_t *param);
+void set_param(uint8_t idx, uint16_t val);
 
-unsigned workset_load(uint8_t num, WORKSET *set);
-unsigned workset_save(uint8_t num, WORKSET *set);
+void trim_name(char *name, int length);
+
+int get_workset_name_addr(uint8_t num);
+int get_workset_addr(uint8_t num);
+int get_user_name_addr(uint8_t num);
 
 #endif	/* WORKSET_H */
 

@@ -5,72 +5,64 @@
 #include "../lcd.h"
 #include "../hal.h"
 #include "../helper.h"
+#include "../workset.h"
+#include "../eeprom.h"
 
-#include "ui_library.h"
-#include "ui_settings.h"
+/* +lcdconv */
 
 static const char str1[] = "Библиотека изделий";
-static const char str4[] = "3-Зап. 6-Чтен. #-Имя";
-static const char str_wr[] = "Записано";
-static const char str_rd[] = "Прочитано";
+static const char str4[] = "3-Зап. 4-Чтен. #-Имя";
+static const char str_rd[] = "Загружено";
+static const char str_wr[] = "Сохранено";
+static const char str_err[] = "Ошибка";
 
-static WORKSET *workset;
+/* -lcdconv */
 
-static uint8_t idx;
-static uint8_t edit;
+extern WORKSET workset; // GLOBAL!
+
+static uint8_t idx = 1;
+static uint8_t edit = 0;
 static char cname[20];
 
-uint8_t ui_library_main(char key);
+int ui_library(char key) {
 
-void ui_library(WORKSET *set)
-{
-    idx = 1;
-    edit = 0;
-    workset = set;
-    if ((set->prod_name[0] > 0) && (set->prod_name[0] <= WORKSET_COUNT)) idx = set->prod_name[0];
-    lcd_clear();
-    ui_library_main(0xFF);
-    for (;;) if (ui_library_main(get_key())) break;
-    lcd_clear();
-}
+    int addr;
 
-uint8_t ui_library_main(char key)
-{
     if (key == 0) return 0;
 
-    if (edit == 0)
-    {
+    if (edit == 0) {
         if (key == '*') return 1;
         if (key == 'A') idx++;
         if (key == 'B') idx--;
         if (idx >= WORKSET_COUNT) idx = 1;
         if (idx == 0) idx = WORKSET_COUNT - 1;
-		workset_load_name(idx, cname);
-	    if (cname[0] == 0xFF) memset(cname, 0, prod_name_sz);
+        memset(cname, 0, sizeof (cname));
+        addr = get_workset_name_addr(idx);
+        eeprom_cs(0, addr);
+        eeprom_read((uint8_t*) cname, WORKSET_NAME_LENGTH);
+        eeprom_status_wait();
     }
 
-    if (key == '#')
-    {
+    if (key == '#') {
         edit = !(edit > 0);
-        if (edit == 0)
-        {
-            workset_save_name(idx, cname);
-        }
-        else
-        {
-			lcd_clr_str(STR3_ADDR);
+        if (edit == 0) {
+            addr = get_workset_name_addr(idx);
+            eeprom_cs(0, addr);
+            eeprom_write((uint8_t*) cname, WORKSET_NAME_LENGTH);
+            eeprom_status_wait();
+        } else {
+            lcd_clr_str(STR3_ADDR);
             lcd_clr_str(STR4_ADDR);
         }
     }
 
-    if (edit)
-    {
+    if (edit) {
         set_char(key, &cname[edit - 1]);
         if (key == '*') edit++;
         if (key == 'C') edit++;
         if (key == 'D') edit--;
-        if (edit > prod_name_sz) edit = 1;
-        if (edit == 0) edit = prod_name_sz;
+        if (edit > WORKSET_NAME_LENGTH) edit = 1;
+        if (edit == 0) edit = WORKSET_NAME_LENGTH;
         print_name(idx, cname);
         lcd_set_cursor(STR2_ADDR + 2 + edit, 1);
         return 0;
@@ -78,26 +70,38 @@ uint8_t ui_library_main(char key)
 
     lcd_clear();
     lcd_print_rom(STR1_ADDR, str1);
-
     print_name(idx, cname);
-
-    if (key == '6')
-    {
-        workset_load(idx, workset);
-        lcd_print_rom(STR3_ADDR, str_rd);
-        memset(workset->prod_name, 0, prod_name_sz);
-        workset->prod_name[0] = idx;
-    }
-
-    if (key == '3')
-    {
-		memcpy(workset->prod_name, cname, prod_name_sz);
-        workset_save(idx, workset);
-        lcd_print_rom(STR3_ADDR, str_wr);
-        memset(workset->prod_name, 0, prod_name_sz);
-        workset->prod_name[0] = idx;
-    }
-
     lcd_print_rom(STR4_ADDR, str4);
+
+    if (key == '3') {
+
+        addr = get_workset_name_addr(idx);
+        eeprom_cs(0, addr);
+        eeprom_write((uint8_t*) & workset, sizeof (workset));
+        if (eeprom_status_wait())
+            lcd_print_rom(STR3_ADDR, str_wr);
+        else
+            lcd_print_rom(STR3_ADDR, str_err);
+    }
+
+    if (key == '4') {
+
+        addr = get_workset_name_addr(idx);
+        eeprom_cs(0, addr);
+        eeprom_read((uint8_t*) & workset, sizeof (workset));
+        if (eeprom_status_wait())
+            lcd_print_rom(STR3_ADDR, str_rd);
+        else
+            lcd_print_rom(STR3_ADDR, str_err);
+
+        addr = get_workset_name_addr(0);
+        eeprom_cs(0, addr);
+        eeprom_write((uint8_t*) & workset, sizeof (workset));
+        if (eeprom_status_wait())
+            lcd_print_rom(STR3_ADDR + 10, str_wr);
+        else
+            lcd_print_rom(STR3_ADDR + 10, str_err);
+    }
+
     return 0;
 }
