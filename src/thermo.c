@@ -18,7 +18,7 @@ const uint8_t thermo_zones[TZ_MAX] =
 typedef struct
 {
     unsigned f_heat_on      :1;
-    unsigned f_heat_ok      :1;
+
 }
 FLAGS;
 
@@ -90,14 +90,17 @@ void thermo_heat_enable(unsigned e)
     {
         for (i = 0; i < TZ_MAX; i++) dio_out(thermo_zones[i], 0);
         dio_flush();
-        flags.f_heat_ok = 0;
     }
     flags.f_heat_on = e;
 }
 
-unsigned thermo_heat_ok(void)
+int thermo_get_tz_state(uint8_t ch)
 {
-    return flags.f_heat_ok;
+    if (ch >= TZ_MAX) return -1;
+    uint16_t *temp_z = &workset.temp_Z1;
+    if (tz_current[ch] < (temp_z[ch] - workset.temp_under)) return -1;
+    if (tz_current[ch] > (temp_z[ch] + workset.temp_over)) return 1;
+    return 0;
 }
 
 uint16_t thermo_get_tz_temp(uint8_t ch)
@@ -141,10 +144,6 @@ void thermo_task(void)
             tz_pwm[i] = (*pwm_z) * PWM_PULSE;
         else
             tz_pwm[i] = 0;
-
-        flags.f_heat_ok = 1;
-        if (tz_current[i] < (*temp_z - workset.temp_under)) flags.f_heat_ok = 0;
-        if (tz_current[i] > (*temp_z + workset.temp_over)) flags.f_heat_ok = 0;
 
         temp_z++;
         pwm_z++;

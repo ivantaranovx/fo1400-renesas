@@ -6,8 +6,7 @@
 #include "../dio.h"
 #include "../lcd.h"
 #include "../thermo.h"
-#include "../fo1400_states.h"
-#include "../helper.h"
+#include "../misc.h"
 
 #include "ui_main.h"
 #include "ui_settings.h"
@@ -21,8 +20,8 @@ typedef struct
 }
 MSG_TEXT;
 
-int get_tz_delta(uint8_t ch);
-char get_tz_char(uint8_t ch);
+int tz_delta(uint8_t ch);
+char tz_state_sym(uint8_t ch);
 
 void clear_store();
 
@@ -40,15 +39,15 @@ static const MSG_TEXT msg_modes[] = {
 
 static const MSG_TEXT msg_status[] = {
     {s_idle, "Cтоп"},
+    {s_done, "Готово"},
     {s_junction_slow, "Замедл. запирание"},
     {s_junction_full, "Полное запирание"},
-/*    {o_inj_push_start, "Подвод  МВ"},
-    {o_inject_start, "Впрыск"},
-    {o_load_start, "Загрузка"},
-    {o_decompression_start, "Декомпрессия"},
-    {o_inj_pop_start, "Отвод МВ"},
-    {o_disjunction_start, "Размыкание"},
-*/
+    {s_inj_push, "Подвод  МВ"},
+    {s_inject, "Впрыск"},
+    {s_load, "Загрузка"},
+    {s_decompression, "Декомпрессия"},
+    {s_inj_pop, "Отвод МВ"},
+    {s_disjunction, "Размыкание"},
 };
 
 static const MSG_TEXT msg_error[] = {
@@ -61,6 +60,7 @@ static const MSG_TEXT msg_error[] = {
     {e_engine_off, "Привод выключен"},
     {e_engine_not_ready, "Привод не готов"},
     {e_engine_overheat, "Перегрев двигателя"},
+    {e_lub_low, "Проверить уров.смаз"},
 };
 
 /* -lcdconv */
@@ -93,13 +93,12 @@ static int screen = scr_return;
 
 extern WORKSET workset; // GLOBAL!
 
-void ui_task(void)
+void ui_task(MAIN_STATE *state)
 {
     static int keydly = 0;
     static int keytmp;
 
     int i, j;
-    MAIN_STATE *state;
     uint8_t key;
 
     if (get_timer(TMR_UI) > 0) return;
@@ -130,8 +129,6 @@ void ui_task(void)
 
     case scr_main:
 
-        state = main_get_state();
-
         if (check_int(state->mode, &main_mode))
         {
             lcd_print_rom(STR1_ADDR, get_msg_text(main_mode, msg_modes));
@@ -160,16 +157,15 @@ void ui_task(void)
             lcd_put_char(state->flags.f.power_on ? 'P' : '_');
             lcd_put_char(state->flags.f.engine_on ? 'M' : '_');
             lcd_put_char(state->flags.f.guard_ok ? 'S' : '_');
-            lcd_put_char(state->flags.f.heat_ok ? 'T' : '_');
+            lcd_put_char(state->flags.f.heat_on ? 'T' : '_');
         }
 
         for (i = 0; i < TZ_MAX; i++)
         {
             if (check_int(thermo_get_tz_temp(i), &tz_temp[i]))
             {
-
                 lcd_set_cursor(STR1_ADDR + 15 + i, 0);
-                lcd_put_char(get_tz_char(i));
+                lcd_put_char(tz_state_sym(i));
             }
         }
 
@@ -243,7 +239,11 @@ void ui_task(void)
             lcd_set_cursor(str_addr[j], 0);
             lcd_put_char(0x30 + j);
             lcd_put_char(0x20);
-            for (i = 0; i < 16; i++) lcd_put_char(0x30 + dio_in((j * 16) + 15 - i));
+            for (i = 0; i < 16; i++)
+            {
+                lcd_put_char(0x30 + dio_in((j * 16) + 15 - i));
+                if (i == 7) lcd_put_char(0x20);
+            }
         }
         if (key == '*') screen = scr_return;
         break;
@@ -255,7 +255,11 @@ void ui_task(void)
             lcd_set_cursor(str_addr[j], 0);
             lcd_put_char(0x30 + j);
             lcd_put_char(0x20);
-            for (i = 0; i < 16; i++) lcd_put_char(0x30 + dio_out_state((j * 16) + 15 - i));
+            for (i = 0; i < 16; i++)
+            {
+                lcd_put_char(0x30 + dio_out_state((j * 16) + 15 - i));
+                if (i == 7) lcd_put_char(0x20);
+            }
         }
         lcd_set_cursor(str_addr[main_mode / 16] + 2 + (15 - (main_mode % 16)), 1);
 
@@ -318,11 +322,11 @@ void ui_task(void)
                    thermo_get_tz_temp(4));
 
         lcd_printf(STR4_ADDR, str_temp,
-                   get_tz_delta(0),
-                   get_tz_delta(1),
-                   get_tz_delta(2),
-                   get_tz_delta(3),
-                   get_tz_delta(4));
+                   tz_delta(0),
+                   tz_delta(1),
+                   tz_delta(2),
+                   tz_delta(3),
+                   tz_delta(4));
 
         if (key == '*') screen = scr_return;
         break;
@@ -364,7 +368,7 @@ void ui_task(void)
 
 }
 
-int get_tz_delta(uint8_t ch)
+int tz_delta(uint8_t ch)
 {
     int d = thermo_get_tz_temp(ch);
     uint16_t *tz = &workset.temp_Z1;
@@ -372,10 +376,9 @@ int get_tz_delta(uint8_t ch)
     return d;
 }
 
-char get_tz_char(uint8_t ch)
+char tz_state_sym(uint8_t ch)
 {
-
-    int d = get_tz_delta(ch);
+    int d = thermo_get_tz_state(ch);
     if (d < 0) return 0xDA;
     if (d > 0) return 0xD9;
     return '=';
@@ -397,5 +400,5 @@ const char *get_msg_text(int code, const MSG_TEXT *text)
     {
         if (text[i].code == code) return text[i].msg;
     }
-    return "MSGTEXT";
+    return "Undefined";
 }

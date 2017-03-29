@@ -1,14 +1,14 @@
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "../lcd.h"
 #include "../hal.h"
 #include "../eeprom.h"
-#include "../helper.h"
+#include "../misc.h"
 #include "../workset.h"
 
-typedef struct {
+typedef struct
+{
     const char *name;
     const char *unit1;
     const char *unit2;
@@ -16,13 +16,13 @@ typedef struct {
 UNIT_PARAM;
 
 // submenu`s in menu
-static const uint8_t main_menu[] ={
+static const uint8_t main_menu[] = {
     7, 11, 19, 16, 5, 5, 5, 3
 };
 
 /* +lcdconv */
 
-static const UNIT_PARAM main_menu_items[] ={
+static const UNIT_PARAM main_menu_items[] = {
     {"Настройка общие", 0, 0},
     {"Настройка таймеров", 0, 0},
     {"Настройка гидроагр.", 0, 0},
@@ -120,25 +120,41 @@ static uint16_t cval;
 static uint16_t cmin;
 static uint16_t cmax;
 
-int ui_settings(char key) {
-
-    char buf[10];
+int ui_settings(char key)
+{
     uint8_t i, j;
     int addr;
 
     if (key == 0) return 0;
 
-    if (edit == 0) {
-        if (key == '*') {
+    if (edit == 1)
+    {
+        i = ui_input_int_process(key);
+        if (i == 0) return 0;
+        if (i == 1) edit = 0;
+        if (i == 2)
+        {
+            cval = ui_input_int_get();
+            edit = 2;
+        }
+        key = 0;
+    }
+
+    if (edit == 0)
+    {
+        if (key == '*')
+        {
             edit = 0;
             return 1;
         }
 
-        if (key == 'A') {
+        if (key == 'A')
+        {
             menu++;
             submenu = 1;
         }
-        if (key == 'B') {
+        if (key == 'B')
+        {
             menu--;
             submenu = 1;
         }
@@ -149,80 +165,77 @@ int ui_settings(char key) {
         if (key == 'D') submenu--;
         if (submenu > main_menu[menu]) submenu = 1;
         if (submenu == 0) submenu = main_menu[menu];
+
+        if (key == '#')
+        {
+            if ((cmin == 0) && (cmax == 1))
+            {
+                cval = (cval > 0)?0:1;
+                edit = 2;
+            }
+            else
+            {
+                ui_input_int(STR3_ADDR + 2, cval, (menu == 2) ? 3 : 0);
+                edit = 1;
+                return 0;
+            }
+        }
+
     }
 
-    if (key == '#') {
-        edit = !(edit > 0);
-        if ((cmin == 0) && (cmax == 1)) {
-            cval = !(cval > 0);
-            edit = 0;
-        }
-        if (edit == 0) {
-            i = get_idx(menu, submenu);
-            if (cval < cmin) cval = cmin;
-            if (cval > cmax) cval = cmax;
-            addr = i;
-            addr <<= 1;
-            addr += get_workset_addr(0);
-            eeprom_cs(0, addr);
-            eeprom_write((uint8_t*) &cval, 2);
-            if (eeprom_status_wait()) set_param(i, cval);
-        }
-    }
+    i = get_idx(menu, submenu); // index of parameter
+    addr = i;
+    addr <<= 1;
+    addr += get_workset_addr(0);
 
-    if (edit) {
-        if ((key >= '0') && (key <= '9')) {
-            utoa(cval, buf, 0);
-            buf[edit - 1] = key;
-            cval = (uint16_t) atol(buf);
-            edit++;
-            if (edit > 5) edit = 1;
-        }
-        lcd_uint(STR3_ADDR + 2, cval, (menu == 2) ? 4 : 0);
-        j = edit + 1;
-        if ((menu == 2) && (edit > 3)) j = edit + 2;
-        lcd_set_cursor(STR3_ADDR + j, 1);
-        return 0;
+    if (edit == 2)
+    {
+        check_limit(i, &cval);
+        edit = 0;
+        eeprom_cs(0, addr);
+        eeprom_write((uint8_t*) & cval, 2);
+        if (eeprom_status_wait()) set_param(i, cval);
     }
 
     lcd_clear();
     lcd_print_rom(STR1_ADDR, main_menu_items[menu - 1].name);
 
-    i = get_idx(menu, submenu); // index of parameter
     j = main_menu[0] + i; // index of parameter name
     lcd_print_rom(STR2_ADDR + 1, main_menu_items[j].name);
 
-    addr = i;
-    addr <<= 1;
-    addr += get_workset_addr(0);
     eeprom_cs(0, addr);
-    eeprom_read((uint8_t*) &cval, 2);
+    eeprom_read((uint8_t*) & cval, 2);
     eeprom_status_wait();
     get_param_limits(i, &cmin, &cmax);
 
-    if ((cmin == 0) && (cmax == 1)) {
+    if ((cmin == 0) && (cmax == 1))
+    {
         lcd_print_rom(STR3_ADDR + 2, (cval == 0) ? main_menu_items[j].unit1 : main_menu_items[j].unit2);
-    } else {
+    }
+    else
+    {
         if (menu == 2) // dot in param
         {
-            lcd_uint(STR3_ADDR + 2, cval, 4);
+            print_uint(STR3_ADDR + 2, cval, 3);
             lcd_print_rom(STR3_ADDR + 9, main_menu_items[j].unit1);
-        } else {
-            lcd_uint(STR3_ADDR + 2, cval, 0);
+        }
+        else
+        {
+            print_uint(STR3_ADDR + 2, cval, 0);
             lcd_print_rom(STR3_ADDR + 8, main_menu_items[j].unit1);
         }
     }
-    if ((cval < cmin) || (cval > cmax)) lcd_print_rom(STR3_ADDR, "!");
 
     lcd_print_rom(STR4_ADDR + 0, str_from);
-    lcd_uint(STR4_ADDR + 3, cmin, (menu == 2) ? 4 : 0);
+    print_uint(STR4_ADDR + 3, cmin, (menu == 2) ? 3 : 0);
     lcd_print_rom(STR4_ADDR + 10, str_to);
-    lcd_uint(STR4_ADDR + 13, cmax, (menu == 2) ? 4 : 0);
+    print_uint(STR4_ADDR + 13, cmax, (menu == 2) ? 3 : 0);
 
     return 0;
 }
 
-uint8_t get_idx(uint8_t menu, uint8_t submenu) {
+uint8_t get_idx(uint8_t menu, uint8_t submenu)
+{
     uint8_t i = 0;
     uint8_t j;
 

@@ -162,6 +162,7 @@ void brd_init(void)
     p13 = 0;
     p15 = 0;
     pd15 = 0xFF;
+
     // pull-up data bus
     pu34 = 1;
     pu35 = 1;
@@ -295,7 +296,8 @@ void uart_print(char *buf)
     }
 }
 
-void uart_printf(const char *fmt, ...) {
+void uart_printf(const char *fmt, ...)
+{
 
     va_list args;
     char buf[256];
@@ -317,7 +319,7 @@ void i2c_io(uint8_t addr, uint8_t *buf, uint16_t len, uint8_t flags)
     i2c_addr = addr;
     i2c_buf = buf;
     i2c_len = len;
-    i2c_flags = flags & 0x7F;
+    i2c_flags = flags & 0x0F;
     i2c_status = -1;
 
     if (bbs_u3smr)
@@ -337,6 +339,8 @@ void UART3_BCn_ISR(void)
         te_u3c1 = 1;
     }
     stspsel_u3smr4 = 0;
+    if (i2c_flags & 0x40) i2c_status = 0;
+    if (i2c_flags & 0x20) i2c_status = 1;
 }
 
 void UART3_TRx_ISR(void)
@@ -349,16 +353,16 @@ void UART3_TRx_ISR(void)
     }
     else
     {
-        if (ir_s3tic)
-        { // NACK
-            i2c_status = 0;
+        if (u3rb & 0x100) // NACK
+        {
+            i2c_flags = 0x40;
             goto ex;
         }
     }
     i2c_flags |= 0x80;
     if (i2c_len == 0)
     {
-        i2c_status = 1;
+        i2c_flags |= 0x20;
         goto ex;
     }
     if (i2c_addr & 1)
@@ -372,18 +376,18 @@ void UART3_TRx_ISR(void)
         i2c_buf++;
         i2c_len--;
     }
+    return;
 ex:
-    ir_s3tic = 0; // NACK
-    ir_s3ric = 0; // ACK
-    if (i2c_status >= 0)
+    te_u3c1 = 0;
+    if (i2c_flags & 0x01)
     {
-        te_u3c1 = 0;
-        if (!(i2c_flags & 0x01))
-        {
-            sdhi_u3smr2 = 1;
-            stpreq_u3smr4 = 1;
-            stspsel_u3smr4 = 1;
-        }
+        i2c_status = 1;
+    }
+    else
+    {
+        sdhi_u3smr2 = 1;
+        stpreq_u3smr4 = 1;
+        stspsel_u3smr4 = 1;
     }
 }
 

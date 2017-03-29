@@ -1,5 +1,6 @@
 
-SRC = m30845.c thermo.c dio.c lcd.c eeprom.c helper.c workset.c fo1400.c \
+SRC = m30845.c thermo.c dio.c lcd.c eeprom.c helper.c workset.c \
+    fo1400_common.c fo1400_mode_adj.c fo1400.c \
     ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c \
     eth/enc28j60.c eth/tcpip.c
 
@@ -30,7 +31,7 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 
 clean:
 	@rm -f $(OBJS)
-	@rm -f $(BUILDDIR)/$(TARGET).elf
-	@rm -f $(BUILDDIR)/$(TARGET).map
+	@rm -rf $(SRCDIR)
+	@rm -rf $(BUILDDIR)
 	@rm -f $(TARGET).mot
 

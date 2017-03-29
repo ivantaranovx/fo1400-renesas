@@ -5,21 +5,21 @@
 #include "../lcd.h"
 #include "../hal.h"
 #include "../eeprom.h"
-#include "../helper.h"
+#include "../misc.h"
 #include "../workset.h"
 #include "../eeprom.h"
 
 /* +lcdconv */
 
 static const char str1[] = "Выбор пользователя";
-static const char str4[] = "*-Выбор #-Имя";
+static const char str4[] = "D-Выбор #-Имя";
 
 /* -lcdconv */
 
 static uint8_t idx = 1;
 static uint8_t edit = 0;
 
-static char cname[20];
+static char cname[USER_NAME_LENGTH + 1];
 
 int ui_users(char key) {
 
@@ -28,7 +28,8 @@ int ui_users(char key) {
     if (key == 0) return 0;
 
     if (edit == 0) {
-        if (key == '*') return 1;
+        if (key == '*') return 1;   // cancel
+        if (key == 'D') return 1;   // select
         if (key == 'A') idx++;
         if (key == 'B') idx--;
         if (idx >= USER_COUNT) idx = 1;
@@ -38,6 +39,7 @@ int ui_users(char key) {
         eeprom_cs(0, addr);
         eeprom_read((uint8_t*) cname, USER_NAME_LENGTH);
         eeprom_status_wait();
+        trim_name(cname, USER_NAME_LENGTH);
     }
 
     if (key == '#') {

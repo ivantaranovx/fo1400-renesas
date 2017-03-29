@@ -2,6 +2,8 @@
 #ifndef FO1400_IO_H
 #define FO1400_IO_H
 
+#include "dio.h"
+
 #define ON  1
 #define OFF 0
 
@@ -61,7 +63,6 @@
 #define EM29(v)     dio_out(22, v)
 #define EM16(v)     dio_out(21, v)
 #define EM1(v)      dio_out(20, v)
-#define EM31(v)     dio_out(19, v)
 #define EM13(v)     dio_out(18, v)
 #define EM30(v)     dio_out(17, v)
 #define EM4(v)      dio_out(16, v)

@@ -14,13 +14,26 @@ MAIN_MODE;
 typedef enum {
     o_idle,
     o_junction,
+    o_inj_push,
+    o_inject,
+    o_load,
+    o_decompression,
+    o_inj_pop,
+    o_disjunction,
 }
 MAIN_OPER;
 
 typedef enum {
     s_idle,
+    s_done,
     s_junction_slow,
     s_junction_full,
+    s_inj_push,
+    s_inject,
+    s_load,
+    s_decompression,
+    s_inj_pop,
+    s_disjunction,
 }
 MAIN_STATUS;
 
@@ -34,16 +47,18 @@ typedef enum {
     e_emergency_stop,
     e_engine_off,
     e_engine_not_ready,
-    e_engine_overheat
+    e_engine_overheat,
+    e_lub_low,
 }
 MAIN_ERROR;
 
 typedef struct {
     unsigned cycle_stop : 1;
     unsigned power_on : 1;
+    unsigned guard_chk : 1;
     unsigned guard_ok : 1;
     unsigned engine_on : 1;
-    unsigned heat_ok : 1;
+    unsigned heat_on : 1;
     unsigned ready : 1;
 }
 MAIN_FLAGS;
@@ -62,8 +77,6 @@ typedef struct {
     MAIN_FLAGS_V flags;
 }
 MAIN_STATE;
-
-MAIN_STATE *main_get_state(void);
 
 #endif /* FO1400_STATES_H */
 

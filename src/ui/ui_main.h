@@ -2,7 +2,9 @@
 #ifndef UI_MAIN_H
 #define	UI_MAIN_H
 
-void ui_task(void);
+#include "../fo1400_states.h"
+
+void ui_task(MAIN_STATE *state);
 
 #endif
 

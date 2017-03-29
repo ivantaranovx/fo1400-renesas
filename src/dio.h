@@ -2,6 +2,8 @@
 #ifndef DIO_H
 #define	DIO_H
 
+#include <stdint.h>
+
 #define INPUTS_MAX      64
 #define OUTPUTS_MAX     64
 
