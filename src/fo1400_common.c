@@ -68,3 +68,15 @@ bool check_heat(MAIN_STATE *state)
     }
     return true;
 }
+
+int check_kn(bool kn, STN stn)
+{
+    static uint16_t store = 0;
+    if (kn ^ ((store & stn) ? true : false))
+    {
+        store ^= stn;
+        if (kn) return 1;
+        return -1;
+    }
+    return 0;
+}

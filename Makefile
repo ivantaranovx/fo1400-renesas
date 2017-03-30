@@ -1,11 +1,11 @@
 
-SRC = m30845.c thermo.c dio.c lcd.c eeprom.c helper.c workset.c \
-    fo1400_common.c fo1400_mode_adj.c fo1400.c \
+SRC = m30845.c thermo.c dio.c lcd.c eeprom.c misc.c workset.c \
+    fo1400_common.c fo1400_mode_adj.c fo1400_mode_manual.c fo1400_mode_semi.c fo1400_mode_auto.c fo1400.c \
     ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c \
     eth/enc28j60.c eth/tcpip.c
 
 TARGET = fo1400
-SRCDIR = esrc
+ESRCDIR = esrc
 BUILDDIR = build
 
 CC = wine "c:\m32c-elf\bin\m32c-elf-gcc.exe"
@@ -25,13 +25,13 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BUILDDIR)/$(TARGET).elf $(OBJS) $(LIBS)
 	${OC} -O srec $(BUILDDIR)/$(TARGET).elf $(TARGET).mot
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.c
+$(BUILDDIR)/%.o: $(ESRCDIR)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	@rm -f $(OBJS)
-	@rm -rf $(SRCDIR)
+	@rm -rf $(ESRCDIR)
 	@rm -rf $(BUILDDIR)
 	@rm -f $(TARGET).mot
 

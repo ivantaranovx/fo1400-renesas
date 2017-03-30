@@ -87,7 +87,7 @@ static const WORKSET_LIM workset_lim[] = {
     {0, 0}
 };
 
-WORKSET workset; // GLOBAL!
+extern WORKSET workset; // GLOBAL!
 
 void get_param_limits(uint8_t idx, uint16_t *min, uint16_t *max)
 {

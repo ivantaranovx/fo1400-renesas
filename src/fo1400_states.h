@@ -13,13 +13,27 @@ MAIN_MODE;
 
 typedef enum {
     o_idle,
+    o_done,
     o_junction,
+    o_junction_break,
+    o_junction_prev,
+    o_junction_lock,
+    o_junction_fast,
     o_inj_push,
     o_inject,
+    o_inject_1,
+    o_inject_2,
+    o_form_hi,
+    o_form,
     o_load,
     o_decompression,
     o_inj_pop,
+    o_cooling,
     o_disjunction,
+    o_disjunction_break,
+    o_disjunction_fast,
+    o_disjunction_slow,
+    o_jump,
 }
 MAIN_OPER;
 
@@ -28,12 +42,24 @@ typedef enum {
     s_done,
     s_junction_slow,
     s_junction_full,
+    s_junction_break,
+    s_junction_fast,
+    s_junction_prev,
+    s_junction_lock,
     s_inj_push,
     s_inject,
+    s_inject_1,
+    s_inject_2,
+    s_form,
     s_load,
     s_decompression,
     s_inj_pop,
+    s_cooling,
     s_disjunction,
+    s_disjunction_break,
+    s_disjunction_fast,
+    s_disjunction_slow,
+    s_jump,
 }
 MAIN_STATUS;
 

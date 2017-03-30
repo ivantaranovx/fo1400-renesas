@@ -42,12 +42,22 @@ static const MSG_TEXT msg_status[] = {
     {s_done, "Готово"},
     {s_junction_slow, "Замедл. запирание"},
     {s_junction_full, "Полное запирание"},
+    {s_junction_break, "Страгивание"},
+    {s_junction_fast, "Смыкание ускор."},
+    {s_junction_prev, "Предохранение"},
+    {s_junction_lock, "Запирание"},
     {s_inj_push, "Подвод  МВ"},
     {s_inject, "Впрыск"},
+    {s_inject_1,"Впрыск 1ст."},
+    {s_inject_2,"Впрыск 2ст."},
+    {s_form, "Формование"},
     {s_load, "Загрузка"},
     {s_decompression, "Декомпрессия"},
     {s_inj_pop, "Отвод МВ"},
     {s_disjunction, "Размыкание"},
+    {s_disjunction_break,"Отрыв"},
+    {s_disjunction_fast,"Размыкание ускор."},
+    {s_disjunction_slow,"Размыкание замедл."},
 };
 
 static const MSG_TEXT msg_error[] = {

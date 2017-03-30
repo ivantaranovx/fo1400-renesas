@@ -3,10 +3,11 @@
 
 #include "fo1400_common.h"
 #include "fo1400_mode_adj.h"
-
-extern WORKSET workset; // GLOBAL!
+#include "fo1400_mode_manual.h"
+#include "fo1400_mode_auto.h"
 
 static MAIN_STATE state;
+WORKSET workset; // GLOBAL!
 
 #define f_ready         state.flags.f.ready
 #define f_cycle_stop    state.flags.f.cycle_stop
@@ -19,8 +20,6 @@ static MAIN_STATE state;
 static int pwr_count = 0;
 static MAIN_MODE mode = m_unknown;
 
-//static uint16_t tmr[19];
-
 void main_task(void)
 {
     if ((mode != state.mode) && (state.oper == o_idle))
@@ -29,21 +28,25 @@ void main_task(void)
         state.error = e_success;
         FAIL(OFF);
         engine_enable(true);
+        if (state.mode == m_manual) f_guard_chk = false;
+        if (state.mode == m_semi) f_guard_chk = false;
+        if (state.mode == m_auto) f_guard_chk = false;
     }
-
-    if (state.mode == m_adjust) op_mode_adj(&state);
-}
-
-int check_kn(bool kn, STN stn)
-{
-    static uint16_t store = 0;
-    if (kn ^ ((store & stn) ? true : false))
+    switch (state.mode)
     {
-        store ^= stn;
-        if (kn) return 1;
-        return -1;
+    case m_adjust:
+        op_mode_adj(&state);
+        break;
+    case m_manual:
+        op_mode_manual(&state);
+        break;
+    case m_semi:
+    case m_auto:
+        op_mode_auto(&state);
+        break;
+    default:
+        break;
     }
-    return 0;
 }
 
 void check_mode_selector(void)
@@ -346,7 +349,7 @@ int main(void)
     if (r == 3)
     {
         lcd_print_rom(STR4_ADDR, err_eeprom);
-        while (get_key() == 0);
+        while (!get_key());
     }
 
     while (get_timer(TMR_SYS) > 0);
