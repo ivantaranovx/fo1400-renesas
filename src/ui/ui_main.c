@@ -7,6 +7,7 @@
 #include "../lcd.h"
 #include "../thermo.h"
 #include "../misc.h"
+#include "../pressure.h"
 
 #include "ui_main.h"
 #include "ui_settings.h"
@@ -23,7 +24,7 @@ MSG_TEXT;
 int tz_delta(uint8_t ch);
 char tz_state_sym(uint8_t ch);
 
-void clear_store();
+void clear_vars();
 
 const char *get_msg_text(int code, const MSG_TEXT *text);
 
@@ -48,19 +49,21 @@ static const MSG_TEXT msg_status[] = {
     {s_junction_lock, "Запирание"},
     {s_inj_push, "Подвод  МВ"},
     {s_inject, "Впрыск"},
-    {s_inject_1,"Впрыск 1ст."},
-    {s_inject_2,"Впрыск 2ст."},
+    {s_inject_1, "Впрыск 1ст."},
+    {s_inject_2, "Впрыск 2ст."},
     {s_form, "Формование"},
     {s_load, "Загрузка"},
     {s_decompression, "Декомпрессия"},
     {s_inj_pop, "Отвод МВ"},
+    {s_cooling, "Охлаждение"},
     {s_disjunction, "Размыкание"},
-    {s_disjunction_break,"Отрыв"},
-    {s_disjunction_fast,"Размыкание ускор."},
-    {s_disjunction_slow,"Размыкание замедл."},
+    {s_disjunction_break, "Отрыв"},
+    {s_disjunction_fast, "Размыкание ускор."},
+    {s_disjunction_slow, "Размыкание замедл."},
 };
 
 static const MSG_TEXT msg_error[] = {
+    {e_success, ""},
     {e_not_powered, "Силовая не включена"},
     {e_emergency_stop, "Аварийный стоп"},
     {e_not_warmed, "Не разогрет МЦ"},
@@ -71,6 +74,19 @@ static const MSG_TEXT msg_error[] = {
     {e_engine_not_ready, "Привод не готов"},
     {e_engine_overheat, "Перегрев двигателя"},
     {e_lub_low, "Проверить уров.смаз"},
+    {e_err_bk1, "Ошибка BK1"},
+    {e_err_bk2, "Ошибка BK2"},
+    {e_err_bk20, "Ошибка BK20"},
+    {e_err_bk21, "Ошибка BK21"},
+    {e_err_bk22, "Ошибка BK22"},
+    {e_err_bk23, "Ошибка BK23"},
+    {e_err_bk25, "Ошибка BK25"},
+    {e_err_bk53, "Ошибка BK53"},
+    {e_err_tmr1, "Ошибка TMR1"},
+    {e_err_tmr2, "Ошибка TMR2"},
+    {e_err_tmr3, "Ошибка TMR3"},
+    {e_err_tmr6, "Ошибка TMR6"},
+    {e_err_tmr8, "Ошибка TMR8"},
 };
 
 /* -lcdconv */
@@ -93,6 +109,7 @@ typedef enum
     scr_library,
     scr_return,
     scr_thermo,
+    scr_analog,
     scr_inputs,
     scr_outputs,
     scr_chars
@@ -196,6 +213,15 @@ void ui_task(MAIN_STATE *state)
             screen = scr_users;
             break;
 
+        case '4':
+
+            lcd_clear();
+            screen = scr_analog;
+            break;
+
+        case '5':
+            for(;;);
+            break;
 
         case '7':
 
@@ -258,6 +284,17 @@ void ui_task(MAIN_STATE *state)
         if (key == '*') screen = scr_return;
         break;
 
+    case scr_analog:
+
+        lcd_clr_str(STR1_ADDR);
+        lcd_printf(STR1_ADDR, "P1 %3.1f kgf", get_pressure_kgf_cm2());
+        lcd_printf(STR2_ADDR, "P2");
+        lcd_printf(STR3_ADDR, "Y1");
+        lcd_printf(STR4_ADDR, "Y2");
+
+        if (key == '*') screen = scr_return;
+        break;
+
     case scr_outputs:
 
         for (j = 0; j < 4; j++)
@@ -297,10 +334,7 @@ void ui_task(MAIN_STATE *state)
         {
             dio_out(main_mode, 2);
         }
-        if (key == '*')
-        {
-            screen = scr_return;
-        }
+        if (key == '*') screen = scr_return;
         break;
 
 
@@ -370,7 +404,7 @@ void ui_task(MAIN_STATE *state)
     case scr_return:
 
         lcd_clear();
-        clear_store();
+        clear_vars();
         screen = scr_main;
         break;
 
@@ -394,7 +428,7 @@ char tz_state_sym(uint8_t ch)
     return '=';
 }
 
-void clear_store()
+void clear_vars()
 {
     for (int i = 0; i < TZ_MAX; i++) tz_temp[i] = INT_MIN;
     tz_int = INT_MIN;
@@ -408,6 +442,7 @@ const char *get_msg_text(int code, const MSG_TEXT *text)
 {
     for (int i = 0;; i++)
     {
+        if (text[i].msg == 0) break;
         if (text[i].code == code) return text[i].msg;
     }
     return "Undefined";

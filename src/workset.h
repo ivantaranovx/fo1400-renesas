@@ -13,7 +13,7 @@
 
 typedef struct {
     uint16_t prod_count; // 0
-    uint16_t nozzle_out; // 1
+    uint16_t inj_pop; // 1
     uint16_t pause; // 2
     uint16_t jump; // 3
     uint16_t evacuation; // 4

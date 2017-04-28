@@ -58,6 +58,7 @@ int eeprom_status_wait(void)
     int r;
     for (r = -1; r < 0; r = eeprom_status())
     {
+        wdt_reset();
     }
 #ifdef DEBUG
     snprintf((char*) page, sizeof (page) - 1, "eeprom_status_wait: %i\r\n", r);
@@ -104,7 +105,7 @@ int eeprom_status(void)
         if (r == 0) break;
         io_status = 1;
         io_state = 0;
-        rst_timer(TMR_EEPROM);
+        kill_timer(TMR_EEPROM);
         break;
 
     case 30:
@@ -126,7 +127,7 @@ int eeprom_status(void)
         {
             io_status = 1;
             io_state = 0;
-            rst_timer(TMR_EEPROM);
+            kill_timer(TMR_EEPROM);
             break;
         }
         io_buf += len;

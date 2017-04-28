@@ -1,5 +1,5 @@
 
-#include <stdlib.h>
+#include <stdbool.h>
 
 #include "hal.h"
 #include "workset.h"
@@ -16,6 +16,9 @@ static MAIN_STATUS op_inj_pop(void);
 static MAIN_STATUS op_disjunction(void);
 
 extern WORKSET workset; // GLOBAL!
+
+bool f_matrix_eject = false;
+bool f_punch_eject = false;
 
 void op_mode_adj(MAIN_STATE *state)
 {
@@ -39,7 +42,7 @@ void op_mode_adj(MAIN_STATE *state)
 
         state->status = s_idle;
 
-        if (KH1)
+        if (check_kn(KH1, S_KH1) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
@@ -47,7 +50,7 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_junction;
             break;
         }
-        if (KH3)
+        if (check_kn(KH3, S_KH3) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
@@ -55,18 +58,16 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_inj_push;
             break;
         }
-        if (KH5)
+        if (check_kn(KH5, S_KH5) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
             state->error = e_success;
             state->oper = o_inject;
-            clr_scale_timer(TMR_SCALE_INJECT);
-            uart_print("inj start\r\n");
             break;
         }
-        if (KH6)
+        if (check_kn(KH6, S_KH6) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
@@ -75,7 +76,7 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_load;
             break;
         }
-        if (KH7)
+        if (check_kn(KH7, S_KH7) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
@@ -84,7 +85,7 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_decompression;
             break;
         }
-        if (KH4)
+        if (check_kn(KH4, S_KH4) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
@@ -92,7 +93,7 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_inj_pop;
             break;
         }
-        if (KH2)
+        if (check_kn(KH2, S_KH2) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
@@ -100,6 +101,9 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_disjunction;
             break;
         }
+
+        f_matrix_eject = 0;
+        f_punch_eject = 0;
         break;
 
     case o_junction:
@@ -116,14 +120,8 @@ void op_mode_adj(MAIN_STATE *state)
 
     case o_inject:
 
-        if (!KH5)
-        {
-            uart_print("inj stop\r\n");
-            OP_BREAK;
-        }
+        if (!KH5) OP_BREAK;
         state->status = op_inject();
-        if (state->status == s_inject)
-            uart_printf("inj %u %i\r\n", get_scale_timer(TMR_SCALE_INJECT), rand());
         break;
 
     case o_load:
@@ -149,7 +147,7 @@ void op_mode_adj(MAIN_STATE *state)
         if (!KH2) OP_BREAK;
         state->status = op_disjunction();
         break;
-        
+
     default:
         break;
     }
@@ -261,12 +259,34 @@ static MAIN_STATUS op_disjunction(void)
 {
     if (BK1)
     {
-        stop();
-        return s_done;
+        set_hydro(0);
+        EM16(OFF);
+        EM4(OFF);
+        EM1(OFF);
+        if (!f_punch_eject)
+        {
+            f_punch_eject = true;
+            EM41(ON);
+            set_timer(TMR_16, workset.tmr_T16 * 10);
+        }
     }
-    set_hydro(workset.hyd_U05);
-    EM16(ON);
-    EM4(ON);
-    EM1(ON);
-    return s_disjunction;
+    else
+    {
+        set_hydro(workset.hyd_U05);
+        EM16(ON);
+        EM4(ON);
+        EM1(ON);
+        if (!f_matrix_eject)
+        {
+            f_matrix_eject = true;
+            EM40(ON);
+            set_timer(TMR_14, workset.tmr_T14 * 10);
+        }
+        return s_disjunction;
+    }
+    if (get_timer(TMR_14) == 0) EM40(OFF);
+    int8_t r = get_timer(TMR_16);
+    if (r == 0) EM41(OFF);
+    if (r > 0) return s_disjunction;
+    return s_done;
 }

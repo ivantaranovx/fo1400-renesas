@@ -1,19 +1,12 @@
 
-#include <stdlib.h>
+#include <stdbool.h>
 
 #include "hal.h"
 #include "workset.h"
 #include "fo1400_io.h"
 #include "fo1400_common.h"
-#include "fo1400_mode_adj.h"
-
-static MAIN_STATUS op_junction(void);
-static MAIN_STATUS op_inj_push(void);
-static MAIN_STATUS op_inject(void);
-static MAIN_STATUS op_load(void);
-static MAIN_STATUS op_decompression(void);
-static MAIN_STATUS op_inj_pop(void);
-static MAIN_STATUS op_disjunction(void);
+#include "fo1400_mode_manual.h"
+#include "pressure.h"
 
 extern WORKSET workset; // GLOBAL!
 
@@ -39,63 +32,81 @@ void op_mode_manual(MAIN_STATE *state)
 
         state->status = s_idle;
 
-        if (KH1)
+        if (check_kn(KH1, S_KH1) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
+            if (BK2) break;
+            if (!BK1) BREAK_ERR(e_err_bk1);
             state->error = e_success;
             state->oper = o_junction;
             break;
         }
-        if (KH3)
+
+        if (check_kn(KH3, S_KH3) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
+            if (BK22) break;
+            if (!BK21) BREAK_ERR(e_err_bk21);
             state->error = e_success;
             state->oper = o_inj_push;
             break;
         }
-        if (KH5)
+
+        if (check_kn(KH5, S_KH5) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
+            if (BK23) break;
+            if (!BK20) BREAK_ERR(e_err_bk20);
             state->error = e_success;
             state->oper = o_inject;
-            clr_scale_timer(TMR_SCALE_INJECT);
-            uart_print("inj start\r\n");
             break;
         }
-        if (KH6)
+
+        if (check_kn(KH6, S_KH6) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
+            if (BK25) break;
+            if (!BK23) BREAK_ERR(e_err_bk23);
             state->error = e_success;
             state->oper = o_load;
             break;
         }
-        if (KH7)
+
+        if (check_kn(KH7, S_KH7) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
+            if (BK20) break;
+            if (!BK25) BREAK_ERR(e_err_bk25);
             state->error = e_success;
             state->oper = o_decompression;
             break;
         }
-        if (KH4)
+
+        if (check_kn(KH4, S_KH4) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
+            if (BK21) break;
+            if (!BK22) BREAK_ERR(e_err_bk22);
             state->error = e_success;
             state->oper = o_inj_pop;
             break;
         }
-        if (KH2)
+
+        if (check_kn(KH2, S_KH2) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
+            if (BK3) break;
+            if (!BK2) BREAK_ERR(e_err_bk2);
             state->error = e_success;
             state->oper = o_disjunction;
             break;
@@ -103,224 +114,169 @@ void op_mode_manual(MAIN_STATE *state)
         break;
 
     case o_junction:
-
-        if (!KH1) OP_BREAK;
-        state->status = op_junction();
-        break;
-
-    case o_inj_push:
-
-        if (!KH3) OP_BREAK;
-        state->status = op_inj_push();
-        break;
-
-    case o_inject:
-
-        if (!KH5)
-        {
-            uart_print("inj stop\r\n");
-            OP_BREAK;
-        }
-        state->status = op_inject();
-        if (state->status == s_inject)
-            uart_printf("inj %u %i\r\n", get_scale_timer(TMR_SCALE_INJECT), rand());
-        break;
-
-    case o_load:
-
-        if (!KH6) OP_BREAK;
-        state->status = op_load();
-        break;
-
-    case o_decompression:
-
-        if (!KH7) OP_BREAK;
-        state->status = op_decompression();
-        break;
-
-    case o_inj_pop:
-
-        if (!KH4) OP_BREAK;
-        state->status = op_inj_pop();
-        break;
-
-    case o_disjunction:
-
-        if (!KH2) OP_BREAK;
-        state->status = op_disjunction();
-        break;
-
-    default:
-        break;
-    }
-
-}
-
-static MAIN_STATUS op_junction(void)
-{
-    static MAIN_STATUS phase;
-
-    if (BK1 && !BK52) phase = s_junction_break;
-    if (BK52 && !BK50) phase = s_junction_fast;
-    if (BK50 && !BK4) phase = s_junction_prev;
-    if (BK4 && !BK2) phase = s_junction_lock;
-    if (BK2) phase = s_done;
-
-    switch (phase)
-    {
-    case s_junction_break:
+        state->status = s_junction_break;
         set_hydro(workset.hyd_U01);
         EM3(ON);
         EM16(ON);
         EM29(ON);
         EM1(ON);
-    case s_junction_fast:
+        if (!BK52) break;
+        stop();
+        state->oper = o_junction_fast;
+        break;
+
+    case o_junction_fast:
+        state->status = s_junction_fast;
         set_hydro(workset.hyd_U02);
         EM3(ON);
         EM16(ON);
         EM29(ON);
         EM1(ON);
+        if (!BK50) break;
+        stop();
+        state->oper = o_junction_prev;
         break;
-    case s_junction_prev:
+
+    case o_junction_prev:
+        state->status = s_junction_prev;
         set_hydro(workset.hyd_U03);
         EM3(ON);
         EM18(ON);
         EM1(ON);
-    case s_junction_lock:
+        if (!BK4) break;
+        stop();
+        state->oper = o_junction_lock;
+        break;
+
+    case o_junction_lock:
+        state->status = s_junction_lock;
         set_hydro(workset.hyd_U04);
         EM3(ON);
         EM16(ON);
         EM1(ON);
-        break;
-    default:
+        if (!BK2) break;
         stop();
+        state->oper = o_idle;
         break;
-    }
-    return phase;
-}
 
-static MAIN_STATUS op_inj_push(void)
-{
-    if (BK22)
-    {
+    case o_inj_push:
+        state->status = s_inj_push;
+        set_hydro(workset.hyd_U06);
+        EM5(ON);
+        EM16(ON);
+        EM1(ON);
+        if (!BK22) break;
         stop();
-        return s_done;
-    }
-    set_hydro(workset.hyd_U06);
-    EM5(ON);
-    EM16(ON);
-    EM1(ON);
-    return s_inj_push;
-}
+        state->oper = o_idle;
+        break;
 
-static MAIN_STATUS op_inject(void)
-{
-    static MAIN_STATUS phase;
+    case o_inject:
+        clr_scale_timer(TMR_SCALE_INJECT);
+        uart_print("inj start\r\n");
+        state->oper = o_inject_1;
+        break;
 
-    if (BK20 && !BK24) phase = s_inject_1;
-    if (BK24 && !BK23) phase = s_inject_2;
-    if (BK23) phase = s_done;
-
-    switch (phase)
-    {
-    case s_inject_1:
+    case o_inject_1:
+        state->status = s_inject_1;
         set_hydro(workset.hyd_U07);
         EM7(ON);
         EM16(ON);
         EM1(ON);
+        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_INJECT), get_pressure_mpa());
+        if (!BK24) break;
+        stop();
+        state->oper = o_inject_2;
         break;
-    case s_inject_2:
+
+    case o_inject_2:
+        state->status = s_inject_2;
         set_hydro(workset.hyd_U08);
         EM7(ON);
         EM16(ON);
         EM1(ON);
+        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_INJECT), get_pressure_mpa());
+        if (!BK23) break;
+        uart_print("inj stop\r\n");
+        stop();
+        state->oper = o_idle;
         break;
-    default:
+
+    case o_load:
+        state->status = s_load;
+        set_hydro(workset.hyd_U10);
+        EM2(ON);
+        EM16(ON);
+        EM13(ON);
+        EM1(ON);
+        if (!BK25) break;
         stop();
+        state->oper = o_idle;
         break;
-    }
 
-    return phase;
-}
-
-static MAIN_STATUS op_load(void)
-{
-    if (BK25)
-    {
+    case o_decompression:
+        state->status = s_decompression;
+        set_hydro(workset.hyd_U11);
+        EM29(ON);
+        EM16(ON);
+        EM12(ON);
+        EM1(ON);
+        if (!BK20) break;
         stop();
-        return s_done;
-    }
-    set_hydro(workset.hyd_U10);
-    EM2(ON);
-    EM16(ON);
-    EM13(ON);
-    EM1(ON);
-    return s_load;
+        state->oper = o_idle;
+        break;
 
-}
-
-static MAIN_STATUS op_decompression(void)
-{
-    if (BK20)
-    {
+    case o_inj_pop:
+        state->status = s_inj_pop;
+        set_hydro(workset.hyd_U13);
+        EM6(ON);
+        EM16(ON);
+        EM1(ON);
+        if (!BK21) break;
         stop();
-        return s_done;
-    }
-    set_hydro(workset.hyd_U11);
-    EM29(ON);
-    EM16(ON);
-    EM12(ON);
-    EM1(ON);
-    return s_decompression;
-}
+        state->oper = o_idle;
+        break;
 
-static MAIN_STATUS op_inj_pop(void)
-{
-    if (BK21)
-    {
-        stop();
-        return s_done;
-    }
-    set_hydro(workset.hyd_U13);
-    EM6(ON);
-    EM16(ON);
-    EM1(ON);
-    return s_inj_pop;
-}
+    case o_disjunction:
+        EM4(ON);
+        EM16(ON);
+        EM1(ON);
+        EM40(ON);
+        set_timer(TMR_14, workset.tmr_T14 * 10);
+        state->oper = o_disjunction_break;
+        break;
 
-static MAIN_STATUS op_disjunction(void)
-{
-    static MAIN_STATUS phase;
-
-    if (BK2 && !BK3) phase = s_disjunction_break;
-    if (BK3 && !BK51) phase = s_disjunction_fast;
-    if (BK51 && !BK1) phase = s_disjunction_slow;
-    if (BK1) phase = s_done;
-
-    switch (phase)
-    {
-    case s_disjunction_break:
+    case o_disjunction_break:
+        state->status = s_disjunction_break;
         set_hydro(workset.hyd_U14);
-        EM16(ON);
-        EM4(ON);
-        EM1(ON);
+        if (!BK3) break;
+        state->oper = o_disjunction_fast;
         break;
-    case s_disjunction_fast:
+
+    case o_disjunction_fast:
+        state->status = s_disjunction_fast;
         set_hydro(workset.hyd_U12);
-        EM16(ON);
-        EM4(ON);
-        EM1(ON);
+        if (!BK51) break;
+        state->oper = o_disjunction_slow;
         break;
-    case s_disjunction_slow:
+
+    case o_disjunction_slow:
+        state->status = s_disjunction_slow;
         set_hydro(workset.hyd_U05);
-        EM16(ON);
-        EM4(ON);
-        EM1(ON);
+        if (!BK1) break;
+        set_hydro(0);
+        EM4(OFF);
+        EM16(OFF);
+        EM1(OFF);
+        EM41(ON);
+        set_timer(TMR_16, workset.tmr_T16 * 10);
+        state->oper = o_idle;
         break;
+
     default:
-        stop();
         break;
     }
 
-    return phase;
+    if (get_timer(TMR_14) == 0) EM40(OFF);
+    if (get_timer(TMR_16) == 0) EM41(OFF);
 }
+

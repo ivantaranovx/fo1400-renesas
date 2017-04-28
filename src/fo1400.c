@@ -9,29 +9,23 @@
 static MAIN_STATE state;
 WORKSET workset; // GLOBAL!
 
-#define f_ready         state.flags.f.ready
-#define f_cycle_stop    state.flags.f.cycle_stop
-#define f_heat_on       state.flags.f.heat_on
-#define f_power_on      state.flags.f.power_on
-#define f_guard_chk     state.flags.f.guard_chk
-#define f_guard_ok      state.flags.f.guard_ok
-#define f_engine_on     state.flags.f.engine_on
-
 static int pwr_count = 0;
 static MAIN_MODE mode = m_unknown;
 
 void main_task(void)
 {
-    if ((mode != state.mode) && (state.oper == o_idle))
+    while (mode != state.mode)
     {
+        stop();
+        if (state.mode == m_auto) f_cycle_stop = true;
         state.mode = mode;
+        state.oper = o_idle;
         state.error = e_success;
         FAIL(OFF);
         engine_enable(true);
-        if (state.mode == m_manual) f_guard_chk = false;
-        if (state.mode == m_semi) f_guard_chk = false;
-        if (state.mode == m_auto) f_guard_chk = false;
+        break;
     }
+
     switch (state.mode)
     {
     case m_adjust:
@@ -100,7 +94,7 @@ void guard_task(void)
         set_timer(TMR_GUARD, 3000);
         if (gc < 5) break;
         f_guard_chk = true;
-        rst_timer(TMR_GUARD);
+        kill_timer(TMR_GUARD);
         state.error = e_success;
         break;
     }
@@ -170,7 +164,7 @@ void engine_task(void)
             engine_state = 20;
             break;
         }
-        if (check_kn(OT, S_OT) > 0)
+        if (OT)
         {
             state.error = e_engine_overheat;
             f_cycle_stop = true;
@@ -192,20 +186,15 @@ void engine_task(void)
     case 11:
         if (get_timer(TMR_ENGINE)) break;
         KM5(ON);
-        set_timer(TMR_ENGINE, 1000);
+        set_timer(TMR_ENGINE, 2000);
         engine_state = 12;
         break;
     case 12:
-        if (get_timer(TMR_ENGINE)) break;
-        ENGINE(ON);
-        set_timer(TMR_ENGINE, 2000);
-        engine_state = 13;
-        break;
-    case 13:
         if (RD)
         {
             f_engine_on = true;
             f_guard_chk = false;
+            engine_enable(true);
             state.error = e_success;
             engine_state = 0;
             break;
@@ -214,7 +203,6 @@ void engine_task(void)
         state.error = e_engine_not_ready;
         engine_state = 20;
         break;
-
     case 20:
         engine_enable(false);
         KM5(OFF);
@@ -293,6 +281,8 @@ int main(void)
 
     brd_init();
 
+    uart_rx_cb_register(uart_rx_cb);
+
     uart_print("\fHarware init complete\r\n");
     uart_printf("Board: %s\r\n", brd_id());
     uart_printf("Machine: %s\r\n", msg_machine);
@@ -308,7 +298,7 @@ int main(void)
         }
         uart_print("error\r\n");
         set_timer(TMR_SYS, 100);
-        while (get_timer(TMR_SYS) > 0);
+        while (get_timer(TMR_SYS) > 0) wdt_reset();
     }
 
     lcd_clear();
@@ -329,8 +319,8 @@ int main(void)
 
     check_kn(true, S_KH10);
     check_kn(true, S_KH12);
+    check_kn(true, S_KH13);
     check_kn(true, S_KH14);
-    check_kn(false, S_OT);
     check_kn(false, S_ENG);
     check_kn(false, S_CE);
     check_kn(true, S_KM1);
@@ -342,6 +332,12 @@ int main(void)
     state.oper = o_idle;
     state.error = e_success;
 
+    if (is_wdt_rst())
+    {
+        lcd_print_rom(STR4_ADDR, err_wdt);
+        wait_keypress();
+    }
+
     for (r = 0; r < 3; r++)
     {
         if (workset_load(0)) break;
@@ -349,10 +345,10 @@ int main(void)
     if (r == 3)
     {
         lcd_print_rom(STR4_ADDR, err_eeprom);
-        while (!get_key());
+        wait_keypress();
     }
 
-    while (get_timer(TMR_SYS) > 0);
+    while (get_timer(TMR_SYS) > 0) wdt_reset();
 
     lcd_clear();
     uart_print("Run\r\n");
@@ -412,5 +408,19 @@ int main(void)
         dio_task();
         tcpip_task();
         ui_task(&state);
+        
+        wdt_reset();
     }
 }
+
+void uart_rx_cb(uint8_t b)
+{
+    
+}
+
+void wait_keypress(void)
+{
+    while (!get_key()) wdt_reset();
+    return;
+}
+

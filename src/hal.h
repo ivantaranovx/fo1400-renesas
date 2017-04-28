@@ -47,6 +47,7 @@ TMR_SCALE_NUM;
 #define TMR_MAX_VALUE     0xFFFF
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // LCD 4bit mode - data bus P11[3:0]
 
@@ -58,6 +59,12 @@ TMR_SCALE_NUM;
 #define WH_RS   p8_6
 #define WH_RW   p8_7
 #define WH_OE   p11_4
+
+/*
+ * watchdog
+ */
+void wdt_reset(void);
+bool is_wdt_rst(void);
 
 /*
  * return board string Id
@@ -93,7 +100,7 @@ int8_t get_timer(TMR_NUM num);
 /*
  * stop timer
  */
-void rst_timer(TMR_NUM num);
+void kill_timer(TMR_NUM num);
 
 void clr_scale_timer(TMR_SCALE_NUM num);
 uint16_t get_scale_timer(TMR_SCALE_NUM num);
@@ -152,6 +159,8 @@ int i2c_io_status(void);
 /*
  * UART functions
  */
+typedef void (*uart_rx_cb_func)(uint8_t b);
+void uart_rx_cb_register(uart_rx_cb_func f);
 void uart_print(char *buf);
 void uart_printf(const char *fmt, ...);
 

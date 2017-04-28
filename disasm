@@ -1,0 +1,3 @@
+#!/bin/bash
+
+wine c:\\m32c-elf\\bin\\m32c-elf-objdump.exe -S --disassemble build/fo1400.elf > fo1400.lst

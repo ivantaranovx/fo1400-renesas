@@ -20,10 +20,10 @@
 #define KH10    !dio_in(62)
 #define KH11    !dio_in(61)
 #define KH12    !dio_in(60)
-#define KH13    !dio_in(59)
+#define KH13    dio_in(59)
 #define KH14    !dio_in(58)
 
-#define OT      !dio_in(57)
+#define OT      dio_in(57)
 #define RD      !dio_in(56)
 #define CE      dio_in(5)
 #define KM1     !dio_in(53)
@@ -35,18 +35,18 @@
 
 #define BK1     dio_in(0)
 #define BK2     !dio_in(1)
-#define BK3     dio_in(2)
+#define BK3     !dio_in(2)
 #define BK4     dio_in(3)
 
 #define BK20    dio_in(18)
 #define BK21    dio_in(19)
-#define BK22    dio_in(20)
-#define BK23    dio_in(22)
+#define BK22    !dio_in(20)
+#define BK23    !dio_in(22)
 #define BK24    dio_in(21)
 #define BK25    dio_in(23)
 
 #define BK50    dio_in(16)
-#define BK51    dio_in(17)
+#define BK51    !dio_in(17)
 #define BK52    dio_in(7)
 #define BK53    dio_in(6)
 

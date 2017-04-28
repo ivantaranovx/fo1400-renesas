@@ -25,17 +25,17 @@
 const char msg_machine[] = "Formoplast 1400";
 const char msg_version[] = "v0.01";
 const char err_eeprom[] = "Ошибка EEPROM";
+const char err_wdt[] = "Системный сбой";
 
 /* -lcdconv */
 
+void wait_keypress(void);
+void uart_rx_cb(uint8_t b);
 void main_task(void);
-
 void check_mode_selector(void);
-
 void engine_task(void);
 void lub_task(void);
 void guard_task(void);
-
 void engine_enable(bool e);
 
 #endif /* FO1400_H */

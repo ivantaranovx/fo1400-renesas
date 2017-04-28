@@ -31,15 +31,19 @@ static uint16_t adc[8];
 static uint8_t uart_ring_buf[uart_ring_buf_sz];
 static uint8_t *uart_in_ptr = uart_ring_buf;
 static uint8_t *uart_out_ptr = uart_ring_buf;
+static uart_rx_cb_func uart_rx_cb;
 
 static uint8_t u0rx;
-static uint8_t u0rx_f;
+static bool u0rx_f;
+static bool rst_wdt_f;
 
 static uint8_t i2c_addr;
 static uint8_t *i2c_buf;
 static uint16_t i2c_len;
 static uint8_t i2c_flags;
 static int i2c_status;
+
+void WDT_ISR(void) ISR;
 
 void AD_ISR(void) ISR;
 void TimerB0_ISR(void) ISR;
@@ -54,9 +58,21 @@ void UART3_BCn_ISR(void) ISR;
 extern void start(void);
 
 /* Interrupt vectors */
+
+const void * __attribute__((section (".vec"))) _vec[8] = {
+    0, //Undefined Instruction
+    0, //Overflow
+    0, //BRK Instruction
+    0, //Address Match
+    0, //Reserved space
+    WDT_ISR, //Watchdog Timer
+    0, //Reserved space
+    0 //NMI
+};
+
 const void *_var_vects[64] = {
 
-    start, // BRK Instruction
+    0, // BRK Instruction
     0, // Reserved Space
     0, // Reserved Space
     0, // Reserved Space
@@ -121,6 +137,23 @@ const void *_var_vects[64] = {
     0, // Reserved Space 
     0, // Reserved Space 
 };
+
+void WDT_ISR(void)
+{
+    rst_wdt_f = true;
+    pm03 = 1;
+}
+
+void wdt_reset(void)
+{
+    wdts = 0;
+    rst_wdt_f = false;
+}
+
+bool is_wdt_rst(void)
+{
+    return rst_wdt_f;
+}
 
 char *brd_id(void)
 {
@@ -248,6 +281,10 @@ void brd_init(void)
     ir_s3ric = 0;
     ir_bcn3ic = 0;
 
+    // watchdog init ~131ms
+    wdc7 = 1;
+    wdts = 0;
+
     // enable interrupts
     ad0ic = 4;
     s0tic = 5;
@@ -276,10 +313,15 @@ void UART1_Tx_ISR(void)
     }
 }
 
+void uart_rx_cb_register(uart_rx_cb_func f)
+{
+    uart_rx_cb = f;
+}
+
 void UART1_Rx_ISR(void)
 {
     uint8_t r = u1rb;
-    if (r == 0) return;
+    if (uart_rx_cb) uart_rx_cb(r);
 }
 
 void uart_print(char *buf)
@@ -453,7 +495,7 @@ int8_t get_timer(TMR_NUM num)
     return 0;
 }
 
-void rst_timer(TMR_NUM num)
+void kill_timer(TMR_NUM num)
 {
     if (num >= TMR_MAX) return;
     timers[num] = TMR_MAX_VALUE;
@@ -520,6 +562,7 @@ void TimerB1_ISR(void)
         ad_delay = 0;
         adst_ad0con0 = 1;
     }
+    
 }
 
 uint16_t get_key_code(void)
@@ -654,12 +697,12 @@ void UART0_Rx_ISR(void)
 {
     u0rx = u0rb;
     ir_s0ric = 0;
-    u0rx_f = 1;
+    u0rx_f = true;
 }
 
 uint8_t spi_io(uint8_t b)
 {
-    u0rx_f = 0;
+    u0rx_f = false;
     u0tb = b;
     te_u0c1 = 1;
     while (!u0rx_f);

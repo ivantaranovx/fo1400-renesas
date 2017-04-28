@@ -13,7 +13,7 @@ MAIN_MODE;
 
 typedef enum {
     o_idle,
-    o_done,
+    o_pause,
     o_junction,
     o_junction_break,
     o_junction_prev,
@@ -75,6 +75,20 @@ typedef enum {
     e_engine_not_ready,
     e_engine_overheat,
     e_lub_low,
+    e_err_bk1,
+    e_err_bk2,
+    e_err_bk20,
+    e_err_bk21,
+    e_err_bk22,
+    e_err_bk23,
+    e_err_bk25,
+    e_err_bk53,
+    e_err_tmr1,
+    e_err_tmr2,
+    e_err_tmr3,
+    e_err_tmr6,
+    e_err_tmr8,
+
 }
 MAIN_ERROR;
 

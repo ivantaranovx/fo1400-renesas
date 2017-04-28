@@ -25,6 +25,7 @@ void stop(void)
     EM12(OFF);
     EM7(OFF);
     EM2(OFF);
+
     EM40(OFF);
     EM41(OFF);
 }
@@ -71,7 +72,7 @@ bool check_heat(MAIN_STATE *state)
 
 int check_kn(bool kn, STN stn)
 {
-    static uint16_t store = 0;
+    static uint16_t store = false;
     if (kn ^ ((store & stn) ? true : false))
     {
         store ^= stn;
