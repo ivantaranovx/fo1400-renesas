@@ -236,8 +236,8 @@ void op_mode_auto(MAIN_STATE *state)
         break;
 
     case o_inj_pop:
-        f_inj_pop = false;
-        if (workset.inj_pop)
+        f_inj_pop = workset.inj_pop;
+        if (f_inj_pop)
         {
             state->status = s_inj_pop;
             set_hydro(workset.hyd_U13);
@@ -247,7 +247,6 @@ void op_mode_auto(MAIN_STATE *state)
             if (!BK2) BREAK_ERR(e_err_bk2);
             if (!BK20) BREAK_ERR(e_err_bk20);
             if (!BK21) break;
-            f_inj_pop = true;
             stop();
         }
         state->oper = o_cooling;
@@ -330,7 +329,7 @@ void op_mode_auto(MAIN_STATE *state)
 
     }
 
-    if (get_timer(TMR_1) < 0) STOP_ERR(e_err_tmr1);
+    if (get_timer(TMR_1) == 0) STOP_ERR(e_err_tmr1);
 
     if (get_timer(TMR_13) == 0)
     {

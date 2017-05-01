@@ -214,8 +214,9 @@ void brd_init(void)
     pu32 = 1;
 
     // A/D setup
-    // Single sweep mode, 10bit
-    // AN0[7:0]
+    // Single sweep mode, AN0[7:0]
+    // 10bit, sample and hold function enabled
+    // fAD divided by 8; Tcycle = 8.25us x 8 = 66us
     ad0con0 = 0b00010000;
     ad0con1 = 0b00101011;
     ad0con2 = 0b00000101;
