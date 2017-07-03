@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "misc.h"
 #include "hal.h"
@@ -50,13 +51,31 @@ void set_char(char key, char *str)
     if (*str > abkeys[i].bKey) *str = abkeys[i].aKey;
 }
 
-void print_name(uint8_t idx, char *name)
+void print_name(uint16_t idx, char *name)
 {
     lcd_clr_str(STR2_ADDR);
     if (*name)
-        lcd_printf(STR2_ADDR, "%02d:%s", idx, name);
+        lcd_printf(STR2_ADDR, "%03hu:%s", idx, name);
     else
-        lcd_printf(STR2_ADDR, "%02d:---", idx);
+        lcd_printf(STR2_ADDR, "%03hu:---", idx);
+}
+
+void print_ex(uint8_t pos, uint8_t type, void *ptr)
+{
+    uint8_t *p8 = ptr;
+    uint16_t *p16 = ptr;
+    switch (type)
+    {
+    case 0:
+        lcd_printf(pos, "%02X:%02X:%02X:%02X:%02X:%02X", p8[0], p8[1], p8[2], p8[3], p8[4], p8[5]);
+        break;
+    case 1:
+        lcd_printf(pos, "%03d.%03d.%03d.%03d", p8[0], p8[1], p8[2], p8[3]);
+        break;
+    case 2:
+        print_uint(pos, *p16, 0);
+        break;
+    }
 }
 
 char b2h(uint8_t val)
@@ -81,16 +100,16 @@ bool check_int(int val, int *store)
 
 void print_uint(uint8_t pos, uint16_t val, uint8_t dot)
 {
-    snprintf(buf, sizeof(buf), "%05u", val);
+    snprintf(buf, sizeof (buf), "%05u", val);
     lcd_printd(pos, buf, dot);
 }
 
-void ui_input_int(uint8_t pos, uint16_t val, uint8_t dot)
+void ui_input_int(uint8_t pos, uint16_t *val, uint8_t dot)
 {
     epos = pos;
     edot = dot;
     idx = 0;
-    print_uint(pos, val, dot);
+    print_uint(pos, *val, dot);
     lcd_set_cursor(epos, 1);
 }
 
@@ -104,14 +123,14 @@ int ui_input_int_process(uint8_t key)
         if (idx > 4) idx = 0;
     }
     lcd_printd(epos, buf, edot);
-    lcd_set_cursor(epos + ((edot > 0) && (idx >= edot)?idx + 1:idx), 1);
+    lcd_set_cursor(epos + ((edot > 0) && (idx >= edot) ? idx + 1 : idx), 1);
     return 0;
 }
 
-uint16_t ui_input_int_get(void)
+void ui_input_int_get(uint16_t *res)
 {
     long int r = atol(buf);
     if (r > UINT16_MAX) r = UINT16_MAX;
-    return (uint16_t) r;
+    *res = r;
 }
 

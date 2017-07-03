@@ -100,6 +100,7 @@ typedef struct {
     unsigned engine_on : 1;
     unsigned heat_on : 1;
     unsigned ready : 1;
+    unsigned cycle_report : 1;
 }
 MAIN_FLAGS;
 
@@ -115,6 +116,9 @@ typedef struct {
     MAIN_STATUS status;
     MAIN_ERROR error;
     MAIN_FLAGS_V flags;
+    uint16_t prod_id;
+    uint16_t user_id;
+    uint16_t user_cf;
 }
 MAIN_STATE;
 

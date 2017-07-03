@@ -8,11 +8,9 @@
 #include "../workset.h"
 #include "../eeprom.h"
 
-void save_name(uint8_t idx);
-void load_name(uint8_t idx);
-void workset_default(uint8_t idx);
-
-/* +lcdconv */
+void save_name(uint16_t idx);
+void load_name(uint16_t idx);
+void workset_default(uint16_t idx);
 
 static const char str1[] = "Библиотека изделий";
 static const char str4[] = "3-Зап  4-Чтен #-Имя ";
@@ -24,13 +22,17 @@ static const char str_err[] = "Ошибка";
 static const char str_rma[] = "Удалить? да-A";
 static const char str_rm[] = "Удалено";
 
-/* -lcdconv */
-
 extern WORKSET workset; // GLOBAL!
 
-static uint8_t idx = 1;
+static uint16_t p_id = 0;
+static uint16_t idx = 1;
 static uint8_t edit = 0;
 static char cname[WORKSET_NAME_LENGTH + 1];
+
+uint16_t ui_library_get_id(void)
+{
+    return p_id;
+}
 
 int ui_library(char key)
 {
@@ -53,8 +55,8 @@ int ui_library(char key)
         if (key == '*') return 1;
         if (key == 'A') idx++;
         if (key == 'B') idx--;
-        if (idx >= WORKSET_COUNT) idx = 1;
-        if (idx == 0) idx = WORKSET_COUNT - 1;
+        if (idx > WORKSET_COUNT) idx = 1;
+        if (idx == 0) idx = WORKSET_COUNT;
         load_name(idx);
     }
 
@@ -81,7 +83,7 @@ int ui_library(char key)
         if (edit > WORKSET_NAME_LENGTH) edit = 1;
         if (edit == 0) edit = WORKSET_NAME_LENGTH;
         print_name(idx, cname);
-        lcd_set_cursor(STR2_ADDR + 2 + edit, 1);
+        lcd_set_cursor(STR2_ADDR + 3 + edit, 1);
         return 0;
     }
 
@@ -93,7 +95,10 @@ int ui_library(char key)
     if (key == '3')
     {
         if (workset_save(idx))
+        {
+            p_id = idx;
             lcd_print_rom(STR3_ADDR, str_wr);
+        }
         else
             lcd_print_rom(STR3_ADDR, str_err);
     }
@@ -101,7 +106,10 @@ int ui_library(char key)
     if (key == '4')
     {
         if (workset_load(idx))
+        {
+            p_id = idx;
             lcd_print_rom(STR3_ADDR, str_rd);
+        }
         else
             lcd_print_rom(STR3_ADDR, str_err);
     }
@@ -115,25 +123,25 @@ int ui_library(char key)
     return 0;
 }
 
-void save_name(uint8_t idx)
+void save_name(uint16_t idx)
 {
-    int addr = get_workset_name_addr(idx);
+    uint16_t addr = get_workset_name_addr(idx);
     eeprom_cs(0, addr);
     eeprom_write((uint8_t*) cname, WORKSET_NAME_LENGTH);
     eeprom_status_wait();
 }
 
-void load_name(uint8_t idx)
+void load_name(uint16_t idx)
 {
     memset(cname, 0, sizeof (cname));
-    int addr = get_workset_name_addr(idx);
+    uint16_t addr = get_workset_name_addr(idx);
     eeprom_cs(0, addr);
     eeprom_read((uint8_t*) cname, WORKSET_NAME_LENGTH);
     eeprom_status_wait();
     trim_name(cname, WORKSET_NAME_LENGTH);
 }
 
-void workset_default(uint8_t idx)
+void workset_default(uint16_t idx)
 {
     WORKSET ws;
     uint16_t p;

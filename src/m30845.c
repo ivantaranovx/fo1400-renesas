@@ -31,17 +31,33 @@ static uint16_t adc[8];
 static uint8_t uart_ring_buf[uart_ring_buf_sz];
 static uint8_t *uart_in_ptr = uart_ring_buf;
 static uint8_t *uart_out_ptr = uart_ring_buf;
-static uart_rx_cb_func uart_rx_cb;
+static uart_rx_cb_func uart_rx_cb = 0;
 
 static uint8_t u0rx;
 static bool u0rx_f;
-static bool rst_wdt_f;
 
 static uint8_t i2c_addr;
 static uint8_t *i2c_buf;
 static uint16_t i2c_len;
 static uint8_t i2c_flags;
 static int i2c_status;
+
+static uint16_t enc[2] = {0};
+
+/*
+ * reserved memory 2 byte
+ * see linker script
+ */
+typedef struct
+{
+    unsigned rst_wdt : 1;
+
+}
+PERSISTENT_FLAGS;
+
+#pragma ADDRESS pflags 0x63FE
+PERSISTENT_FLAGS pflags;
+
 
 void WDT_ISR(void) ISR;
 
@@ -54,12 +70,15 @@ void UART1_Tx_ISR(void) ISR;
 void UART1_Rx_ISR(void) ISR;
 void UART3_TRx_ISR(void) ISR;
 void UART3_BCn_ISR(void) ISR;
+void TimerA3_ISR(void) ISR;
+void TimerA4_ISR(void) ISR;
 
 extern void start(void);
 
 /* Interrupt vectors */
 
-const void * __attribute__((section (".vec"))) _vec[8] = {
+const void * __attribute__((section(".vec"))) _vec[8] = {
+
     0, //Undefined Instruction
     0, //Overflow
     0, //BRK Instruction
@@ -87,8 +106,8 @@ const void *_var_vects[64] = {
     0, // Timer A0
     0, // Timer A1
     0, // Timer A2
-    0, // Timer A3
-    0, // Timer A4
+    TimerA3_ISR,  // Timer A3
+    TimerA4_ISR,  // Timer A4
     UART0_Tx_ISR, // UART0 Transmission, NACK
     UART0_Rx_ISR, // UART0 Reception, ACK
     UART1_Tx_ISR, // UART1 Transmission, NACK
@@ -140,19 +159,34 @@ const void *_var_vects[64] = {
 
 void WDT_ISR(void)
 {
-    rst_wdt_f = true;
+    // disable interrupts
+    ad0ic = 0;
+    s0tic = 0;
+    s0ric = 0;
+    s1ric = 0;
+    s1tic = 0;
+    s3tic = 0;
+    s3ric = 0;
+    bcn3ic = 0;
+    tb1ic = 0;
+
+    pflags.rst_wdt = true;
+
+    // reset
+    prc1 = 1;
     pm03 = 1;
+    prc1 = 0;
 }
 
 void wdt_reset(void)
 {
-    wdts = 0;
-    rst_wdt_f = false;
+    wdts = 0xff;
+    pflags.rst_wdt = false;
 }
 
 bool is_wdt_rst(void)
 {
-    return rst_wdt_f;
+    return pflags.rst_wdt;
 }
 
 char *brd_id(void)
@@ -162,29 +196,37 @@ char *brd_id(void)
 
 void brd_init(void)
 {
-    for (int i = 0; i < TMR_MAX; i++) timers[i] = TMR_MAX_VALUE;
-    for (int i = 0; i < TMR_SCALE_MAX; i++) scale_timers[i] = TMR_MAX_VALUE;
-    for (int i = 0; i < 8; i++) adc[i] = 0;
+    // not ready
+    BUS_RDY = 1;
+    pd7_4 = 1;
 
     // main clock divider set to 1:1 (clock = 32MHz)
     prc0 = 1;
     mcd = 0x12;
     prc0 = 0;
 
-    // not ready
-    p7_4 = 1;
-    pd7_4 = 1;
+    for (int i = 0; i < TMR_MAX; i++) timers[i] = TMR_MAX_VALUE;
+    for (int i = 0; i < TMR_SCALE_MAX; i++) scale_timers[i] = TMR_MAX_VALUE;
+    for (int i = 0; i < 8; i++) adc[i] = 0;
+
+    // check cold startup bit
+    if (!wdc5)
+    {
+        wdc5 = 1;
+        pflags.rst_wdt = false;
+    }
 
     // Timer B0 setup (T=1us)
     // clock = f1 (32MHz)
     // timer mode
     tb0mr = 0b00000000;
-    tb0ic = 3;
+    tb0ic = 1;
 
     // Timer B1 setup (T=1ms)
     // clock = f8 (4MHz)
     // timer mode
     tb1mr = 0b00000000;
+    tb1s = 1;
 
     // keyboard
     // pull-up P10[7:4]
@@ -282,11 +324,25 @@ void brd_init(void)
     ir_s3ric = 0;
     ir_bcn3ic = 0;
 
+    // two-phase processing
+    ta3mr = 0b11010001;
+    ta3p = 1;
+    ta3 = 0;
+    ta3s = 1;
+
+    ta4mr = 0b11010001;
+    ta4p = 1;
+    ta4 = 0;
+    ta4s = 1;
+
     // watchdog init ~131ms
     wdc7 = 1;
-    wdts = 0;
+    wdts = 0xff;
 
     // enable interrupts
+    ta3ic = 2;
+    ta4ic = 2;
+    tb1ic = 3;
     ad0ic = 4;
     s0tic = 5;
     s0ric = 5;
@@ -295,8 +351,6 @@ void brd_init(void)
     s3tic = 5;
     s3ric = 5;
     bcn3ic = 5;
-    tb1ic = 4;
-    tb1s = 1;
 }
 
 /***************** UART *****************/
@@ -329,8 +383,11 @@ void uart_print(char *buf)
 {
     while (*buf)
     {
+        while ((te_u1c1) && (uart_in_ptr == uart_out_ptr));
+
         *(uart_in_ptr++) = *(buf++);
         if (uart_in_ptr >= &uart_ring_buf[uart_ring_buf_sz]) uart_in_ptr = uart_ring_buf;
+
         if (!te_u1c1)
         {
             te_u1c1 = 1;
@@ -341,14 +398,11 @@ void uart_print(char *buf)
 
 void uart_printf(const char *fmt, ...)
 {
-
     va_list args;
     char buf[256];
-
     va_start(args, fmt);
     vsnprintf(buf, sizeof (buf), fmt, args);
     va_end(args);
-
     uart_print(buf);
 }
 
@@ -451,7 +505,7 @@ void AD_ISR(void)
     }
 }
 
-double adc_get_u(uint8_t ch)
+double get_adc_u(uint8_t ch)
 {
     double res;
     res = adc[ch] >> 4;
@@ -459,7 +513,7 @@ double adc_get_u(uint8_t ch)
     return res / 1023;
 }
 
-void dac_set(uint8_t ch, uint8_t val)
+void set_dac(uint8_t ch, uint8_t val)
 {
     if (ch == 0) da0 = val;
     if (ch == 1) da1 = val;
@@ -563,7 +617,7 @@ void TimerB1_ISR(void)
         ad_delay = 0;
         adst_ad0con0 = 1;
     }
-    
+
 }
 
 uint16_t get_key_code(void)
@@ -596,7 +650,7 @@ char get_key(void)
     return 0xFF;
 }
 
-void bus_enable(unsigned e)
+void bus_enable(bool e)
 {
     BUS_RDY = !e;
 }
@@ -654,7 +708,7 @@ void lcd_write(unsigned char v)
     WH_PORT_IN();
 }
 
-unsigned lcd_busy(void)
+bool lcd_busy(void)
 {
     WH_RS = 0;
     _delay_us(1);
@@ -671,10 +725,12 @@ unsigned lcd_busy(void)
         WH_OE = 0;
         _delay_us(1);
 
-        if ((t & 0x08) == 0) return 0;
+        if ((t & 0x08) == 0) return false;
         _delay_us(1);
+        
+        wdts = 0xff;
     }
-    return 1;
+    return true;
 }
 
 void lcd_set_rs(unsigned v)
@@ -684,7 +740,7 @@ void lcd_set_rs(unsigned v)
 
 /***************** SPI *****************/
 
-void spi_select(unsigned val)
+void spi_cs(bool val)
 {
     p6_0 = !val;
 }
@@ -710,12 +766,58 @@ uint8_t spi_io(uint8_t b)
     return u0rx;
 }
 
-unsigned spi_enc_int(void)
+bool eth_int(void)
 {
     return !p6_4;
 }
 
-void spi_enc_rst(unsigned val)
+void eth_rst(void)
 {
-    p6_5 = !val;
+    p6_5 = 0;
+    _delay_us(1);
+    p6_5 = 1;
 }
+
+void TimerA3_ISR(void)
+{
+    if (ta3 & 0x8000)
+    {
+        enc[0]--;
+    }
+    else
+    {
+        enc[0]++;
+    }
+}
+
+void TimerA4_ISR(void)
+{
+    if (ta4 & 0x8000)
+    {
+        enc[1]--;
+    }
+    else
+    {
+        enc[1]++;
+    }
+}
+
+int32_t get_enc(uint8_t ch)
+{
+    uint16_t r[2] = {0};
+    switch(ch)
+    {
+    case 0:
+        r[0] = ta3;
+        r[1] = enc[0];
+        break;
+    case 1:
+        r[0] = ta4;
+        r[1] = enc[1];
+        break;
+    default:
+        break;
+    }
+    return *((int32_t*)&r);
+}
+

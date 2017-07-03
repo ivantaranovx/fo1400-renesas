@@ -13,6 +13,7 @@
 #include "ui_settings.h"
 #include "ui_library.h"
 #include "ui_users.h"
+#include "ui_lan.h"
 
 typedef struct
 {
@@ -27,8 +28,6 @@ char tz_state_sym(uint8_t ch);
 void clear_vars();
 
 const char *get_msg_text(int code, const MSG_TEXT *text);
-
-/* +lcdconv */
 
 static const MSG_TEXT msg_modes[] = {
     {m_adjust, "Налад."},
@@ -89,8 +88,6 @@ static const MSG_TEXT msg_error[] = {
     {e_err_tmr8, "Ошибка TMR8"},
 };
 
-/* -lcdconv */
-
 static const char str_temp[] = "%4i%4i%4i%4i%4i";
 static const uint8_t str_addr[] = {STR1_ADDR, STR2_ADDR, STR3_ADDR, STR4_ADDR};
 
@@ -110,6 +107,7 @@ typedef enum
     scr_return,
     scr_thermo,
     scr_analog,
+    scr_ipaddr,
     scr_inputs,
     scr_outputs,
     scr_chars
@@ -220,7 +218,10 @@ void ui_task(MAIN_STATE *state)
             break;
 
         case '5':
-            for(;;);
+
+            lcd_clear();
+            ui_ipaddr(0xFF);
+            screen = scr_ipaddr;
             break;
 
         case '7':
@@ -287,10 +288,10 @@ void ui_task(MAIN_STATE *state)
     case scr_analog:
 
         lcd_clr_str(STR1_ADDR);
-        lcd_printf(STR1_ADDR, "P1 %3.1f kgf", get_pressure_kgf_cm2());
+        lcd_printf(STR1_ADDR, "P1 %05.1f kgf", get_pressure_kgf_cm2());
         lcd_printf(STR2_ADDR, "P2");
-        lcd_printf(STR3_ADDR, "Y1");
-        lcd_printf(STR4_ADDR, "Y2");
+        lcd_printf(STR3_ADDR, "Y1 %*ld", 11, get_enc(0));
+        lcd_printf(STR4_ADDR, "Y2 %*ld", 11, get_enc(1));
 
         if (key == '*') screen = scr_return;
         break;
@@ -338,6 +339,12 @@ void ui_task(MAIN_STATE *state)
         break;
 
 
+    case scr_ipaddr:
+
+        if (!ui_ipaddr(key)) break;
+        screen = scr_return;
+        break;
+
     case scr_settings:
 
         if (!ui_settings(key)) break;
@@ -347,12 +354,15 @@ void ui_task(MAIN_STATE *state)
     case scr_library:
 
         if (!ui_library(key)) break;
+        state->prod_id = ui_library_get_id();
         screen = scr_return;
         break;
 
     case scr_users:
 
         if (!ui_users(key)) break;
+        state->user_id = ui_users_get_id();
+        state->user_cf = ui_users_get_cf();
         screen = scr_return;
         break;
 

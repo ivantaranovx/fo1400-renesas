@@ -56,7 +56,7 @@ uint16_t thermo_get_int_temp(void)
     int i;
     double u = 0;
     double t = 0;
-    double adc = adc_get_u(0);
+    double adc = get_adc_u(0);
     static uint16_t result = 0;
 
     if (adc == 0) return 0;
@@ -134,7 +134,7 @@ void thermo_task(void)
 
     for (i = 0; i < TZ_MAX; i++)
     {
-        c_temp = adc_get_u(i + 1);
+        c_temp = get_adc_u(i + 1);
         if (c_temp > 4.85) c_temp = 4.85;
         if (c_temp < 0.095) c_temp = 0.095;
         c_temp = ((4.85 - c_temp) * 102);

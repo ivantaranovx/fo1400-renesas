@@ -311,6 +311,7 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK21) BREAK_ERR(e_err_bk21);
         if (!BK53) break;
         stop();
+        state->flags.f.cycle_report = true;
         state->oper = o_pause;
         set_timer(TMR_9, workset.tmr_T09 * 10);
         break;

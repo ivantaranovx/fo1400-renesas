@@ -35,7 +35,7 @@ void set_hydro(uint16_t speed)
     double dac = speed;
     dac /= 9.8039;
     if (dac > 255) dac = 255;
-    dac_set(0, (uint8_t) round(dac));
+    set_dac(0, (uint8_t) round(dac));
 }
 
 bool check_guard(MAIN_STATE *state)

@@ -10,14 +10,15 @@ void hex(uint8_t val, char *buf);
 
 void set_char(char key, char *str);
 
-void print_name(uint8_t idx, char *name);
+void print_name(uint16_t idx, char *name);
 void print_uint(uint8_t pos, uint16_t val, uint8_t dot);
+void print_ex(uint8_t pos, uint8_t type, void *ptr);
 
 bool check_int(int val, int *store);
 
-void ui_input_int(uint8_t pos, uint16_t val, uint8_t dot);
+void ui_input_int(uint8_t pos, uint16_t *val, uint8_t dot);
 int ui_input_int_process(uint8_t key);
-uint16_t ui_input_int_get(void);
+void ui_input_int_get(uint16_t *res);
 
 #endif /* HELPER_H */
 

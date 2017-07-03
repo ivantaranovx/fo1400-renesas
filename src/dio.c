@@ -25,7 +25,6 @@ void dio_init(void) {
     for (i = 0; i < OUT_WORDS; i++) out_data[i] = 0;
     f_out_data_changed = 0xFFFF;
     dio_flush();
-    bus_enable(1);
     for (i = 0; i < INPUTS_MAX; i++) inputs[i].count = 0;
     for (;;) {
         dio_task();

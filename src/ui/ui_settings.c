@@ -17,10 +17,8 @@ UNIT_PARAM;
 
 // submenu`s in menu
 static const uint8_t main_menu[] = {
-    7, 11, 19, 16, 5, 5, 5, 3
+    7, 11, 19, 16, 5, 5, 9, 3
 };
-
-/* +lcdconv */
 
 static const UNIT_PARAM main_menu_items[] = {
     {"Настройка общие", 0, 0},
@@ -97,16 +95,18 @@ static const UNIT_PARAM main_menu_items[] = {
     {"Формование выс.", "кгс", 0},
     {"Формование низ.", "кгс", 0},
     {"Подпор", "кгс", 0},
+    {"Авар. разыкания", "кгс", 0},
+    {"Авар. предохр.", "кгс", 0},
+    {"Авар. смыкания", "кгс", 0},
+    {"Авар. MAX", "кгс", 0},
 
     {"конец 1 ст. впрыска", "", 0},
     {"конец 2 ст. впрыска", "", 0},
-    {"Формование выс.", "", 0}
+    {"Формование выс.", "", 0},
 };
 
 static const char str_from[] = "от";
 static const char str_to[] = "до";
-
-/* -lcdconv */
 
 uint8_t get_idx(uint8_t menu, uint8_t submenu);
 
@@ -134,7 +134,7 @@ int ui_settings(char key)
         if (i == 1) edit = 0;
         if (i == 2)
         {
-            cval = ui_input_int_get();
+            ui_input_int_get(&cval);
             edit = 2;
         }
         key = 0;
@@ -170,12 +170,12 @@ int ui_settings(char key)
         {
             if ((cmin == 0) && (cmax == 1))
             {
-                cval = (cval > 0)?0:1;
+                cval = (cval > 0) ? 0 : 1;
                 edit = 2;
             }
             else
             {
-                ui_input_int(STR3_ADDR + 2, cval, (menu == 2) ? 3 : 0);
+                ui_input_int(STR3_ADDR + 2, &cval, (menu == 2) ? 3 : 0);
                 edit = 1;
                 return 0;
             }

@@ -6,11 +6,12 @@
 #include "fo1400_mode_manual.h"
 #include "fo1400_mode_auto.h"
 
-static MAIN_STATE state;
 WORKSET workset; // GLOBAL!
 
-static int pwr_count = 0;
+static MAIN_STATE state;
 static MAIN_MODE mode = m_unknown;
+static uint32_t pwr_count = 0;
+static uint32_t pwr_count_t = 0;
 
 void main_task(void)
 {
@@ -23,6 +24,7 @@ void main_task(void)
         state.error = e_success;
         FAIL(OFF);
         engine_enable(true);
+        pwr_count_t = pwr_count;
         break;
     }
 
@@ -275,6 +277,12 @@ void lub_task(void)
     }
 }
 
+void wait_keypress(void)
+{
+    while (!get_key()) wdt_reset();
+    return;
+}
+
 int main(void)
 {
     int r;
@@ -282,6 +290,8 @@ int main(void)
     brd_init();
 
     uart_rx_cb_register(uart_rx_cb);
+    tcp_conn_cb_register(tcp_conn_cb);
+    tcp_rx_cb_register(tcp_rx_cb);
 
     uart_print("\fHarware init complete\r\n");
     uart_printf("Board: %s\r\n", brd_id());
@@ -332,6 +342,10 @@ int main(void)
     state.oper = o_idle;
     state.error = e_success;
 
+    state.prod_id = 0;
+    state.user_id = 0;
+    state.user_cf = 0;
+
     if (is_wdt_rst())
     {
         lcd_print_rom(STR4_ADDR, err_wdt);
@@ -350,6 +364,7 @@ int main(void)
 
     while (get_timer(TMR_SYS) > 0) wdt_reset();
 
+    bus_enable(true);
     lcd_clear();
     uart_print("Run\r\n");
 
@@ -399,6 +414,31 @@ int main(void)
 
         if (check_kn(CE, S_CE) > 0) pwr_count++;
 
+        if (state.flags.f.cycle_report)
+        {
+            state.flags.f.cycle_report = false;
+
+            char buf[10];
+            tcpip_send("{\"type\":\"cycle\",\"m_id\":");
+            snprintf(buf, sizeof (buf) - 1, "%hu", tcpip_get_id());
+            tcpip_send(buf);
+            tcpip_send(",\"p_id\":");
+            snprintf(buf, sizeof (buf) - 1, "%hu", state.prod_id);
+            tcpip_send(buf);
+            tcpip_send(",\"u_id\":");
+            snprintf(buf, sizeof (buf) - 1, "%hu", state.user_id);
+            tcpip_send(buf);
+            tcpip_send(",\"u_cf\":");
+            snprintf(buf, sizeof (buf) - 1, "%hu", state.user_cf);
+            tcpip_send(buf);
+            tcpip_send(",\"pwr\":");
+            snprintf(buf, sizeof (buf) - 1, "%lu", pwr_count - pwr_count_t);
+            tcpip_send(buf);
+            tcpip_send("}");
+
+            pwr_count_t = pwr_count;
+        }
+
         check_mode_selector();
         guard_task();
         engine_task();
@@ -408,19 +448,33 @@ int main(void)
         dio_task();
         tcpip_task();
         ui_task(&state);
-        
+
         wdt_reset();
     }
 }
 
-void uart_rx_cb(uint8_t b)
+void tcp_conn_cb(bool connected)
 {
-    
+    if (!connected) return;
+
+    char buf[10];
+    tcpip_send("{\"type\":\"helo\",\"id\":");
+    snprintf(buf, sizeof (buf) - 1, "%hu", tcpip_get_id());
+    tcpip_send(buf);
+    tcpip_send(",\"name\":\"");
+    tcpip_send((char*) msg_machine);
+    tcpip_send("\",\"version\":\"");
+    tcpip_send((char*) msg_version);
+    tcpip_send("\"}");
 }
 
-void wait_keypress(void)
+void tcp_rx_cb(char *data, uint16_t len)
 {
-    while (!get_key()) wdt_reset();
-    return;
+
+}
+
+void uart_rx_cb(uint8_t b)
+{
+
 }
 

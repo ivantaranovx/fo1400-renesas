@@ -5,11 +5,11 @@
 #include <stdint.h>
 
 #define WORKSET_NAME_LENGTH     16
-#define WORKSET_PARAM_COUNT     64
-#define WORKSET_COUNT           100
+#define WORKSET_PARAM_COUNT     68
+#define WORKSET_COUNT           400
 
 #define USER_NAME_LENGTH        16
-#define USER_COUNT              100
+#define USER_COUNT              200
 
 typedef struct {
     uint16_t prod_count; // 0
@@ -78,12 +78,16 @@ typedef struct {
     uint16_t pres_form_hi; // 58
     uint16_t pres_form_lo; // 59
     uint16_t pres_lock; // 60
+    uint16_t pres_e_disjunc; // 61
+    uint16_t pres_e_save; // 62
+    uint16_t pres_e_junc; // 63
+    uint16_t pres_e_max; // 64
 
-    uint16_t end_end1st; // 61
-    uint16_t end_end2st; // 62
-    uint16_t end_form_hi; // 63
+    uint16_t end_end1st; // 65
+    uint16_t end_end2st; // 66
+    uint16_t end_form_hi; // 67
 }
-WORKSET;
+WORKSET; // 136bytes
 
 void get_param_limits(uint8_t idx, uint16_t *min, uint16_t *max);
 void check_limit(uint8_t idx, uint16_t *val);
@@ -91,12 +95,12 @@ void set_param(uint8_t idx, uint16_t val);
 
 void trim_name(char *name, int length);
 
-int get_workset_name_addr(uint8_t num);
-int get_workset_addr(uint8_t num);
-int get_user_name_addr(uint8_t num);
+uint16_t get_workset_name_addr(uint16_t num);
+uint16_t get_workset_addr(uint16_t num);
+uint16_t get_user_name_addr(uint16_t num);
 
-int workset_save(uint8_t idx);
-int workset_load(uint8_t idx);
+int workset_save(uint16_t idx);
+int workset_load(uint16_t idx);
 
 #endif /* WORKSET_H */
 

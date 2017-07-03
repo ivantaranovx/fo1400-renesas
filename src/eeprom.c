@@ -6,7 +6,7 @@
 #include "eeprom.h"
 #include "lcd.h"
 
-//#define DEBUG
+#define DEBUG
 
 static uint8_t addr_m;
 static uint16_t addr_w;
@@ -20,7 +20,7 @@ static int io_status;
 void eeprom_cs(uint8_t bank, uint16_t addr)
 {
 #ifdef DEBUG
-    snprintf((char*) page, sizeof (page) - 1, "eeprom_cs: %i, %i\r\n", bank, addr);
+    snprintf((char*) page, sizeof (page) - 1, "eeprom_cs: %i, %04X\r\n", bank, addr);
     uart_print((char*) page);
 #endif
     addr_m = 0xA0 | ((bank & 7) << 1);

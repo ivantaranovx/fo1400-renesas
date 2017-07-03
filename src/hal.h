@@ -9,8 +9,10 @@ typedef enum {
     TMR_GUARD,
     TMR_UI,
 
-    TMR_TCP,
+    TMR_ARP,
+    TMR_UIP,
     TMR_EEPROM,
+    TMR_SRV,
 
     TMR_1,
     TMR_2,
@@ -108,12 +110,12 @@ uint16_t get_scale_timer(TMR_SCALE_NUM num);
 /*
  * return AD value for selected channel (0-7)
  */
-double adc_get_u(uint8_t ch);
+double get_adc_u(uint8_t ch);
 
 /*
  * set DA value for selected channel (0-1)
  */
-void dac_set(uint8_t ch, uint8_t val);
+void set_dac(uint8_t ch, uint8_t val);
 
 /*
  * return keys scan code
@@ -129,7 +131,7 @@ char get_key(void);
 /*
  * system bus
  */
-void bus_enable(unsigned e);
+void bus_enable(bool e);
 void bus_write(uint8_t addr, uint16_t data);
 uint16_t bus_read(uint8_t addr);
 
@@ -168,16 +170,21 @@ void uart_printf(const char *fmt, ...);
  * LCD functions
  */
 void lcd_write(uint8_t v);
-unsigned lcd_busy(void);
+bool lcd_busy(void);
 void lcd_set_rs(unsigned v);
 
 /*
- * SPI, ENC finctions
+ * SPI, ENC28J60 finctions
  */
-void spi_select(unsigned val);
+void spi_cs(bool val);
 uint8_t spi_io(uint8_t b);
-unsigned spi_enc_int(void);
-void spi_enc_rst(unsigned val);
+bool eth_int(void);
+void eth_rst(void);
+
+/*
+ * quadrature encoder
+ */
+int32_t get_enc(uint8_t ch);
 
 #endif /* M30845_H */
 
