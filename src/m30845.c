@@ -1,9 +1,9 @@
 
+#include "hal.h"
+#include "sfr32c84.h"
+
 #include <stdarg.h>
 #include <stdio.h>
-
-#include "sfr32c84.h"
-#include "hal.h"
 
 #define ISR __attribute__ ((interrupt))
 
@@ -21,7 +21,7 @@
 #define BUS_LO      p12
 #define BUS_HI      p13
 
-static uint16_t timers[TMR_MAX];
+static uint32_t timers[TMR_MAX];
 static uint16_t scale_timers[TMR_SCALE_MAX];
 
 static uint16_t code = 0;
@@ -43,6 +43,40 @@ static uint8_t i2c_flags;
 static int i2c_status;
 
 static uint16_t enc[2] = {0};
+
+static char *tmr_names[] = {
+    "TMR_SYS",
+    "TMR_ENGINE",
+    "TMR_LUB",
+    "TMR_GUARD",
+    "TMR_UI",
+    "TMR_HYD",
+
+    "TMR_ARP",
+    "TMR_UIP",
+    "TMR_EEPROM",
+    "TMR_SRV",
+
+    "TMR_1",
+    "TMR_2",
+    "TMR_3",
+    "TMR_4",
+    "TMR_5",
+    "TMR_6",
+    "TMR_7",
+    "TMR_8",
+    "TMR_9",
+    "TMR_10",
+    "TMR_11",
+    "TMR_12",
+    "TMR_13",
+    "TMR_14",
+    "TMR_15",
+    "TMR_16",
+    "TMR_17",
+    "TMR_18",
+    "TMR_19",
+};
 
 /*
  * reserved memory 2 byte
@@ -205,8 +239,8 @@ void brd_init(void)
     mcd = 0x12;
     prc0 = 0;
 
-    for (int i = 0; i < TMR_MAX; i++) timers[i] = TMR_MAX_VALUE;
-    for (int i = 0; i < TMR_SCALE_MAX; i++) scale_timers[i] = TMR_MAX_VALUE;
+    for (int i = 0; i < TMR_MAX; i++) timers[i] = UINT32_MAX;
+    for (int i = 0; i < TMR_SCALE_MAX; i++) scale_timers[i] = UINT16_MAX;
     for (int i = 0; i < 8; i++) adc[i] = 0;
 
     // check cold startup bit
@@ -534,26 +568,29 @@ void TimerB0_ISR(void)
 }
 
 /* utilize B1 timer */
-void set_timer(TMR_NUM num, uint16_t delay)
+void set_timer(TMR_NUM num, uint32_t delay)
 {
     if (num >= TMR_MAX) return;
-    if (delay == TMR_MAX_VALUE) delay--;
+    if (num >= TMR_1) uart_printf("set_timer %s delay %lu\r\n", tmr_names[num], delay);
+    if (delay == UINT32_MAX) delay--;
     timers[num] = delay;
 }
 
 int8_t get_timer(TMR_NUM num)
 {
     if (num >= TMR_MAX) return -1;
-    if (timers[num] == TMR_MAX_VALUE) return -1;
+    if (timers[num] == UINT32_MAX) return -1;
     if (timers[num] > 0) return 1;
-    timers[num] = TMR_MAX_VALUE;
+    timers[num] = UINT32_MAX;
+    if (num >= TMR_1) uart_printf("timer %s is done\r\n", tmr_names[num]);
     return 0;
 }
 
 void kill_timer(TMR_NUM num)
 {
     if (num >= TMR_MAX) return;
-    timers[num] = TMR_MAX_VALUE;
+    if (num >= TMR_1) uart_printf("timer %s is killed\r\n", tmr_names[num]);
+    timers[num] = UINT32_MAX;
 }
 
 void clr_scale_timer(TMR_SCALE_NUM num)
@@ -564,7 +601,7 @@ void clr_scale_timer(TMR_SCALE_NUM num)
 
 uint16_t get_scale_timer(TMR_SCALE_NUM num)
 {
-    if (num >= TMR_SCALE_MAX) return TMR_MAX_VALUE;
+    if (num >= TMR_SCALE_MAX) return UINT16_MAX;
     return scale_timers[num];
 }
 
@@ -582,12 +619,12 @@ void TimerB1_ISR(void)
 
     for (i = 0; i < TMR_MAX; i++)
     {
-        if (timers[i] == TMR_MAX_VALUE) continue;
+        if (timers[i] == UINT32_MAX) continue;
         if (timers[i] > 0) timers[i]--;
     }
     for (i = 0; i < TMR_SCALE_MAX; i++)
     {
-        if (scale_timers[i] < TMR_MAX_VALUE) scale_timers[i]++;
+        if (scale_timers[i] < UINT16_MAX) scale_timers[i]++;
     }
 
     // keyboard scan

@@ -19,6 +19,7 @@ static const WORKSET_LIM workset_lim[WORKSET_PARAM_COUNT] = {
     {1, 200},
     {0, 1},
     {0, 1},
+    {0, 1},
     {1, 100},
     {1, 20},
     {1, 50},

@@ -9,7 +9,7 @@
 
 /* inputs */
 
-#define KH0     !dio_in(52)
+#define KH0     dio_in(52)
 #define KH1     !dio_in(35)
 #define KH2     !dio_in(36)
 #define KH3     !dio_in(37)
@@ -17,7 +17,7 @@
 #define KH5     !dio_in(39)
 #define KH6     !dio_in(48)
 #define KH7     !dio_in(49)
-#define KH10    !dio_in(62)
+#define KH10    dio_in(62)
 #define KH11    !dio_in(61)
 #define KH12    !dio_in(60)
 #define KH13    dio_in(59)

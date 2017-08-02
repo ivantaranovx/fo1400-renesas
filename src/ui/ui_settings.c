@@ -10,14 +10,14 @@
 typedef struct
 {
     const char *name;
-    const char *unit1;
-    const char *unit2;
+    const char *str_y;
+    const char *str_n;
 }
 UNIT_PARAM;
 
 // submenu`s in menu
 static const uint8_t main_menu[] = {
-    7, 11, 19, 16, 5, 5, 9, 3
+    7, 12, 19, 16, 5, 5, 9, 3
 };
 
 static const UNIT_PARAM main_menu_items[] = {
@@ -33,6 +33,7 @@ static const UNIT_PARAM main_menu_items[] = {
     {"Отвод сопла", "с отводом", "без отвода"},
     {"Пауза контр.", "мс.", 0},
     {"Подскок", "с подскоком", "без подскока"},
+    {"Пневмосьем", "да", "нет"},
     {"Опорожнение формы", "с опорож.", "без опорож."},
     {"Период смазки", "мин.", 0},
     {"Период перез.см.", "мин.", 0},
@@ -210,19 +211,19 @@ int ui_settings(char key)
 
     if ((cmin == 0) && (cmax == 1))
     {
-        lcd_print_rom(STR3_ADDR + 2, (cval == 0) ? main_menu_items[j].unit1 : main_menu_items[j].unit2);
+        lcd_print_rom(STR3_ADDR + 2, (cval > 0) ? main_menu_items[j].str_y : main_menu_items[j].str_n);
     }
     else
     {
         if (menu == 2) // dot in param
         {
             print_uint(STR3_ADDR + 2, cval, 3);
-            lcd_print_rom(STR3_ADDR + 9, main_menu_items[j].unit1);
+            lcd_print_rom(STR3_ADDR + 9, main_menu_items[j].str_y);
         }
         else
         {
             print_uint(STR3_ADDR + 2, cval, 0);
-            lcd_print_rom(STR3_ADDR + 8, main_menu_items[j].unit1);
+            lcd_print_rom(STR3_ADDR + 8, main_menu_items[j].str_y);
         }
     }
 

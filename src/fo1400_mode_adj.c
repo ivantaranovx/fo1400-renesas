@@ -17,9 +17,6 @@ static MAIN_STATUS op_disjunction(void);
 
 extern WORKSET workset; // GLOBAL!
 
-bool f_matrix_eject = false;
-bool f_punch_eject = false;
-
 void op_mode_adj(MAIN_STATE *state)
 {
     if (state->oper != (MAIN_OPER) s_idle)
@@ -101,9 +98,6 @@ void op_mode_adj(MAIN_STATE *state)
             state->oper = o_disjunction;
             break;
         }
-
-        f_matrix_eject = 0;
-        f_punch_eject = 0;
         break;
 
     case o_junction:
@@ -257,18 +251,14 @@ static MAIN_STATUS op_inj_pop(void)
 
 static MAIN_STATUS op_disjunction(void)
 {
+    int r1, r2;
+
     if (BK1)
     {
         set_hydro(0);
         EM16(OFF);
         EM4(OFF);
         EM1(OFF);
-        if (!f_punch_eject)
-        {
-            f_punch_eject = true;
-            EM41(ON);
-            set_timer(TMR_16, workset.tmr_T16 * 10);
-        }
     }
     else
     {
@@ -276,17 +266,22 @@ static MAIN_STATUS op_disjunction(void)
         EM16(ON);
         EM4(ON);
         EM1(ON);
-        if (!f_matrix_eject)
+        if (workset.p_s)
         {
-            f_matrix_eject = true;
             EM40(ON);
-            set_timer(TMR_14, workset.tmr_T14 * 10);
+            set_timer(TMR_14, (uint32_t) (workset.tmr_T14) * 10);
+            EM41(ON);
+            set_timer(TMR_16, (uint32_t) (workset.tmr_T16) * 10);
         }
         return s_disjunction;
     }
-    if (get_timer(TMR_14) == 0) EM40(OFF);
-    int8_t r = get_timer(TMR_16);
-    if (r == 0) EM41(OFF);
-    if (r > 0) return s_disjunction;
+
+    r1 = get_timer(TMR_14); 
+    if (r1 == 0) EM40(OFF);
+
+    r2 = get_timer(TMR_16); 
+    if (r2 == 0) EM41(OFF);
+
+    if ((r1 > 0) || (r2 > 0)) return s_disjunction;
     return s_done;
 }

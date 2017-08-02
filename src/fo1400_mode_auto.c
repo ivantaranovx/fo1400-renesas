@@ -33,7 +33,7 @@ void op_mode_auto(MAIN_STATE *state)
     switch (state->oper)
     {
     case o_idle:
-        
+
         r = check_kn(KH1, S_KH1);
 
         if (state->mode == m_semi)
@@ -44,7 +44,7 @@ void op_mode_auto(MAIN_STATE *state)
 
         if (state->mode == m_auto)
         {
-            if (r > 0) 
+            if (r > 0)
             {
                 state->error = e_success;
                 state->flags.f.cycle_stop = false;
@@ -65,7 +65,7 @@ void op_mode_auto(MAIN_STATE *state)
 
         state->oper = o_junction_break;
         state->error = e_success;
-        set_timer(TMR_1, workset.tmr_T01 * 10);
+        set_timer(TMR_1, (uint32_t)(workset.tmr_T01) * 10);
         break;
 
     case o_junction_break:
@@ -92,7 +92,7 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK50) break;
         stop();
         state->oper = o_junction_prev;
-        set_timer(TMR_2, workset.tmr_T02 * 10);
+        set_timer(TMR_2, (uint32_t)(workset.tmr_T02) * 10);
         break;
 
     case o_junction_prev:
@@ -117,6 +117,7 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK20) BREAK_ERR(e_err_bk20);
         if (!BK2) break;
         stop();
+        set_timer(TMR_HYD, 200);
         state->oper = o_inj_push;
         break;
 
@@ -134,7 +135,7 @@ void op_mode_auto(MAIN_STATE *state)
             stop();
         }
         state->oper = o_inject_1;
-        set_timer(TMR_3, workset.tmr_T03 * 10);
+        set_timer(TMR_3, (uint32_t)(workset.tmr_T03) * 10);
         clr_scale_timer(TMR_SCALE_INJECT);
         uart_print("inj start\r\n");
         break;
@@ -169,7 +170,7 @@ void op_mode_auto(MAIN_STATE *state)
         uart_print("inj stop\r\n");
         stop();
         state->oper = o_form_hi;
-        set_timer(TMR_10, workset.tmr_T10 * 10);
+        set_timer(TMR_10, (uint32_t)(workset.tmr_T10) * 10);
         break;
 
     case o_form_hi:
@@ -184,7 +185,7 @@ void op_mode_auto(MAIN_STATE *state)
         if (get_timer(TMR_10) > 0) break;
         stop();
         state->oper = o_form;
-        set_timer(TMR_4, workset.tmr_T04 * 10);
+        set_timer(TMR_4, (uint32_t)(workset.tmr_T04) * 10);
         break;
 
     case o_form:
@@ -200,8 +201,8 @@ void op_mode_auto(MAIN_STATE *state)
         if (get_timer(TMR_4) > 0) break;
         stop();
         state->oper = o_load;
-        set_timer(TMR_5, workset.tmr_T05 * 10);
-        set_timer(TMR_6, workset.tmr_T06 * 10);
+        set_timer(TMR_5, (uint32_t)(workset.tmr_T05) * 10);
+        set_timer(TMR_6, (uint32_t)(workset.tmr_T06) * 10);
         break;
 
     case o_load:
@@ -255,7 +256,12 @@ void op_mode_auto(MAIN_STATE *state)
     case o_cooling:
         state->status = s_cooling;
         if (get_timer(TMR_5) > 0) break;
-        set_timer(TMR_13, workset.tmr_T13 * 10);
+        if (workset.p_s)
+        {
+            set_timer(TMR_13, (uint32_t)(workset.tmr_T13) * 10);
+            set_timer(TMR_15, (uint32_t)(workset.tmr_T15) * 10);
+            set_timer(TMR_17, (uint32_t)(workset.tmr_T17) * 10);
+        }
         state->oper = o_disjunction_break;
         break;
 
@@ -266,62 +272,61 @@ void op_mode_auto(MAIN_STATE *state)
         EM16(ON);
         EM1(ON);
         if (!BK20) BREAK_ERR(e_err_bk20);
-        if (!BK21) BREAK_ERR(e_err_bk21);
+        if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK3) break;
-        set_timer(TMR_15, workset.tmr_T15 * 10);
-        stop();
         state->oper = o_disjunction_fast;
         break;
 
     case o_disjunction_fast:
         state->status = s_disjunction_fast;
         set_hydro(workset.hyd_U12);
-        EM4(ON);
-        EM16(ON);
-        EM1(ON);
         if (!BK20) BREAK_ERR(e_err_bk20);
-        if (!BK21) BREAK_ERR(e_err_bk21);
+        if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK51) break;
-        stop();
         state->oper = o_disjunction_slow;
-        set_timer(TMR_8, workset.tmr_T08 * 10);
+        set_timer(TMR_8, (uint32_t)(workset.tmr_T08) * 10);
         break;
 
     case o_disjunction_slow:
         state->status = s_disjunction_slow;
         set_hydro(workset.hyd_U05);
-        EM4(ON);
-        EM16(ON);
-        EM1(ON);
         if (!BK20) BREAK_ERR(e_err_bk20);
-        if (!BK21) BREAK_ERR(e_err_bk21);
+        if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (get_timer(TMR_8) < 0) BREAK_ERR(e_err_tmr8);
         if (!BK1) break;
-        stop();
-        state->oper = o_jump;
+        EM4(OFF);
+        state->flags.f.cycle_report = true;
+        state->oper = o_pause;
+        if (workset.jump) state->oper = o_jump;
         break;
 
     case o_jump:
         state->status = s_jump;
         set_hydro(workset.hyd_U16);
         EM3(ON);
-        EM16(ON);
-        EM1(ON);
         if (!BK20) BREAK_ERR(e_err_bk20);
-        if (!BK21) BREAK_ERR(e_err_bk21);
+        if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK53) break;
-        stop();
-        state->flags.f.cycle_report = true;
+        set_hydro(0);
         state->oper = o_pause;
-        set_timer(TMR_9, workset.tmr_T09 * 10);
+        set_timer(TMR_9, (uint32_t)(workset.tmr_T09) * 10);
         break;
 
     case o_pause:
         state->status = s_done;
-        kill_timer(TMR_1);
+        EM3(OFF);
+        EM16(OFF);
+        EM1(OFF);
+        if (get_timer(TMR_1) > 0) kill_timer(TMR_1);
         if (!BK20) BREAK_ERR(e_err_bk20);
-        if (!BK21) BREAK_ERR(e_err_bk21);
+        if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (get_timer(TMR_9) > 0) break;
+        if (get_timer(TMR_13) > 0) break;
+        if (get_timer(TMR_14) > 0) break;
+        if (get_timer(TMR_15) > 0) break;
+        if (get_timer(TMR_16) > 0) break;
+        if (get_timer(TMR_17) > 0) break;
+        if (get_timer(TMR_18) > 0) break;
         state->oper = o_idle;
         break;
 
@@ -335,14 +340,23 @@ void op_mode_auto(MAIN_STATE *state)
     if (get_timer(TMR_13) == 0)
     {
         EM40(ON);
-        set_timer(TMR_14, workset.tmr_T14 * 10);
+        set_timer(TMR_14, (uint32_t)(workset.tmr_T14) * 10);
     }
+    if (get_timer(TMR_14) == 0) EM40(OFF);
+
     if (get_timer(TMR_15) == 0)
     {
         EM41(ON);
-        set_timer(TMR_16, workset.tmr_T16 * 10);
+        set_timer(TMR_16, (uint32_t)(workset.tmr_T16) * 10);
     }
-    if (get_timer(TMR_14) == 0) EM40(OFF);
     if (get_timer(TMR_16) == 0) EM41(OFF);
+
+    if (get_timer(TMR_17) == 0)
+    {
+        EM40(ON);
+        set_timer(TMR_18, (uint32_t)(workset.tmr_T18) * 10);
+    }
+    if (get_timer(TMR_18) == 0) EM40(OFF);
+
 }
 

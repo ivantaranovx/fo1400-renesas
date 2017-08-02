@@ -9,6 +9,7 @@
 
 #define f_ready         state.flags.f.ready
 #define f_cycle_stop    state.flags.f.cycle_stop
+#define f_cycle_report  state.flags.f.cycle_report
 #define f_heat_on       state.flags.f.heat_on
 #define f_power_on      state.flags.f.power_on
 #define f_guard_chk     state.flags.f.guard_chk
@@ -43,6 +44,7 @@ typedef enum {
     S_KH7 = 1 << 11,
     S_KH4 = 1 << 12,
     S_KH2 = 1 << 13,
+    S_KH0 = 1 << 14,
 }
 STN;
 

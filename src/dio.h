@@ -1,6 +1,6 @@
 
 #ifndef DIO_H
-#define	DIO_H
+#define DIO_H
 
 #include <stdint.h>
 
@@ -13,8 +13,9 @@ void dio_task(void);
 unsigned dio_in(uint8_t num);
 void dio_out(uint8_t num, unsigned v);
 unsigned dio_out_state(uint8_t num);
+void dio_out_reset(void);
 
 void dio_flush(void);
 
-#endif	/* DIO_H */
+#endif /* DIO_H */
 

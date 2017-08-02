@@ -240,8 +240,12 @@ void op_mode_manual(MAIN_STATE *state)
         EM4(ON);
         EM16(ON);
         EM1(ON);
-        EM40(ON);
-        set_timer(TMR_14, workset.tmr_T14 * 10);
+        if (workset.p_s)    // disable - watchdog
+        {
+            set_timer(TMR_13, (uint32_t)(workset.tmr_T13) * 10);
+            set_timer(TMR_15, (uint32_t)(workset.tmr_T15) * 10);
+            set_timer(TMR_17, (uint32_t)(workset.tmr_T17) * 10);
+        }
         state->oper = o_disjunction_break;
         break;
 
@@ -267,8 +271,6 @@ void op_mode_manual(MAIN_STATE *state)
         EM4(OFF);
         EM16(OFF);
         EM1(OFF);
-        EM41(ON);
-        set_timer(TMR_16, workset.tmr_T16 * 10);
         state->oper = o_idle;
         break;
 
@@ -276,7 +278,25 @@ void op_mode_manual(MAIN_STATE *state)
         break;
     }
 
+    if (get_timer(TMR_13) == 0)
+    {
+        EM40(ON);
+        set_timer(TMR_14, (uint32_t)(workset.tmr_T14) * 10);
+    }
     if (get_timer(TMR_14) == 0) EM40(OFF);
+
+    if (get_timer(TMR_15) == 0)
+    {
+        EM41(ON);
+        set_timer(TMR_16, (uint32_t)(workset.tmr_T16) * 10);
+    }
     if (get_timer(TMR_16) == 0) EM41(OFF);
+
+    if (get_timer(TMR_17) == 0)
+    {
+        EM40(ON);
+        set_timer(TMR_18, (uint32_t)(workset.tmr_T18) * 10);
+    }
+    if (get_timer(TMR_18) == 0) EM40(OFF);
 }
 

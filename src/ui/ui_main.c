@@ -59,6 +59,7 @@ static const MSG_TEXT msg_status[] = {
     {s_disjunction_break, "Отрыв"},
     {s_disjunction_fast, "Размыкание ускор."},
     {s_disjunction_slow, "Размыкание замедл."},
+    {s_jump, "Подскок"},
 };
 
 static const MSG_TEXT msg_error[] = {
@@ -231,11 +232,11 @@ void ui_task(MAIN_STATE *state)
             break;
 
         case '8':
-
+            if (state->mode != m_adjust) break;
             lcd_clear();
             screen = scr_outputs;
-            lcd_set_cursor(STR1_ADDR + 2, 1);
             main_mode = 0;
+            lcd_set_cursor(STR1_ADDR + 2, 1);
             break;
 
         case '9':
@@ -309,7 +310,9 @@ void ui_task(MAIN_STATE *state)
                 if (i == 7) lcd_put_char(0x20);
             }
         }
-        lcd_set_cursor(str_addr[main_mode / 16] + 2 + (15 - (main_mode % 16)), 1);
+        i = (15 - (main_mode % 16));
+        if (i > 7) i++;
+        lcd_set_cursor(str_addr[main_mode / 16] + 2 + i, 1);
 
         if (key == 'A')
         {
@@ -335,7 +338,11 @@ void ui_task(MAIN_STATE *state)
         {
             dio_out(main_mode, 2);
         }
-        if (key == '*') screen = scr_return;
+        if (key == '*')
+        {
+            dio_out_reset();
+            screen = scr_return;
+        }
         break;
 
 

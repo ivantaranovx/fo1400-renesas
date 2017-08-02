@@ -2,12 +2,16 @@
 #ifndef M30845_H
 #define M30845_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef enum {
     TMR_SYS = 0,
     TMR_ENGINE,
     TMR_LUB,
     TMR_GUARD,
     TMR_UI,
+    TMR_HYD,
 
     TMR_ARP,
     TMR_UIP,
@@ -46,11 +50,6 @@ typedef enum {
 }
 TMR_SCALE_NUM;
 
-#define TMR_MAX_VALUE     0xFFFF
-
-#include <stdint.h>
-#include <stdbool.h>
-
 // LCD 4bit mode - data bus P11[3:0]
 
 #define WH_PORT p11
@@ -87,9 +86,9 @@ void _delay_us(uint16_t delay);
 /*
  * for general purpose delays (nonblock)
  * num - timer number
- * delay - delay in ms (65534 max)
+ * delay - delay in ms
  */
-void set_timer(TMR_NUM num, uint16_t delay);
+void set_timer(TMR_NUM num, uint32_t delay);
 
 /*
  * num - timer number

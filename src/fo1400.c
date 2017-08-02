@@ -18,6 +18,7 @@ void main_task(void)
     while (mode != state.mode)
     {
         stop();
+        kill_timer(TMR_1);
         if (state.mode == m_auto) f_cycle_stop = true;
         state.mode = mode;
         state.oper = o_idle;
@@ -27,6 +28,9 @@ void main_task(void)
         pwr_count_t = pwr_count;
         break;
     }
+
+    // wait hydro stop
+    if (get_timer(TMR_HYD) > 0) return;
 
     switch (state.mode)
     {
@@ -253,7 +257,7 @@ void lub_task(void)
             lub_state = 8;
             break;
         }
-        set_timer(TMR_LUB, workset.lub_time * 1000);
+        set_timer(TMR_LUB, (uint32_t) (workset.lub_time) * 1000);
         KM7(ON);
         lub_state = 4;
         break;
@@ -298,7 +302,7 @@ int main(void)
     uart_printf("Machine: %s\r\n", msg_machine);
     uart_printf("Version: %s\r\n", msg_version);
 
-    while (1)
+    while (true)
     {
         uart_print("LCD init: ");
         if (lcd_init())
@@ -324,10 +328,11 @@ int main(void)
     f_engine_on = false;
     f_heat_on = false;
     f_cycle_stop = false;
+    f_cycle_report = false;
 
     dio_init();
 
-    check_kn(true, S_KH10);
+    check_kn(false, S_KH10);
     check_kn(true, S_KH12);
     check_kn(true, S_KH13);
     check_kn(true, S_KH14);
@@ -394,7 +399,7 @@ int main(void)
         }
 
         r = check_kn(KH10, S_KH10);
-        if (r > 0)
+        if (r < 0)
         {
             f_ready = false;
             RDY(OFF);
@@ -406,17 +411,23 @@ int main(void)
                 state.oper = o_idle;
             }
         }
-        if (r < 0)
+        if (r > 0)
         {
+            state.error = e_success;
             f_ready = true;
             RDY(ON);
         }
 
+        if ((check_kn(KH0, S_KH0) > 0) && !KH10)
+        {
+            state.error = e_emergency_stop;
+        }
+
         if (check_kn(CE, S_CE) > 0) pwr_count++;
 
-        if (state.flags.f.cycle_report)
+        if (f_cycle_report)
         {
-            state.flags.f.cycle_report = false;
+            f_cycle_report = false;
 
             char buf[10];
             tcpip_send("{\"type\":\"cycle\",\"m_id\":");
