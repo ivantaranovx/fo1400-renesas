@@ -1,5 +1,5 @@
 
-SRC = m30845.c thermo.c dio.c lcd.c eeprom.c misc.c workset.c pressure.c \
+SRC = m30845.c thermo.c dio.c lcd.c eeprom.c misc.c json.c workset.c pressure.c \
     fo1400_common.c fo1400_mode_adj.c fo1400_mode_manual.c fo1400_mode_auto.c fo1400.c \
     ui/ui_main.c ui/ui_settings.c ui/ui_library.c ui/ui_users.c ui/ui_lan.c \
     eth/uip/uip.c eth/uip/uip_arp.c eth/uip/uiplib.c eth/uip/psock.c \

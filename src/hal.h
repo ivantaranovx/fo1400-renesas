@@ -16,7 +16,6 @@ typedef enum {
     TMR_ARP,
     TMR_UIP,
     TMR_EEPROM,
-    TMR_SRV,
 
     TMR_1,
     TMR_2,
@@ -43,8 +42,11 @@ typedef enum {
 TMR_NUM;
 
 typedef enum {
-    TMR_SCALE_INJECT,
     TMR_SCALE_TPWM,
+
+    TMR_SCALE_D0,
+    TMR_SCALE_D1,
+    TMR_SCALE_D2,
 
     TMR_SCALE_MAX
 }
@@ -104,12 +106,13 @@ int8_t get_timer(TMR_NUM num);
 void kill_timer(TMR_NUM num);
 
 void clr_scale_timer(TMR_SCALE_NUM num);
-uint16_t get_scale_timer(TMR_SCALE_NUM num);
+void run_scale_timer(TMR_SCALE_NUM num, bool run);
+uint32_t get_scale_timer(TMR_SCALE_NUM num);
 
 /*
  * return AD value for selected channel (0-7)
  */
-double get_adc_u(uint8_t ch);
+float get_adc_u(uint8_t ch);
 
 /*
  * set DA value for selected channel (0-1)

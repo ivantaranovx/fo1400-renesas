@@ -15,17 +15,29 @@ static uint32_t pwr_count_t = 0;
 
 void main_task(void)
 {
+    MAIN_STATE *ps = &state;
+
     while (mode != state.mode)
     {
+        if ((state.mode == m_semi) && (state.oper != o_idle)) break;
+        if ((state.mode == m_auto) && (state.oper != o_idle)) break;
+
         stop();
-        kill_timer(TMR_1);
-        if (state.mode == m_auto) f_cycle_stop = true;
         state.mode = mode;
         state.oper = o_idle;
-        state.error = e_success;
         FAIL(OFF);
         engine_enable(true);
         pwr_count_t = pwr_count;
+        state.err[0] = e_success;
+
+        state.stat[1] = s_none;
+        state.stat[2] = s_none;
+        run_scale_timer(TMR_SCALE_D1, false);
+        run_scale_timer(TMR_SCALE_D2, false);
+        clr_scale_timer(TMR_SCALE_D1);
+        clr_scale_timer(TMR_SCALE_D2);
+
+        ps = 0;
         break;
     }
 
@@ -35,14 +47,14 @@ void main_task(void)
     switch (state.mode)
     {
     case m_adjust:
-        op_mode_adj(&state);
+        op_mode_adj(ps);
         break;
     case m_manual:
-        op_mode_manual(&state);
+        op_mode_manual(ps);
         break;
     case m_semi:
     case m_auto:
-        op_mode_auto(&state);
+        op_mode_auto(ps);
         break;
     default:
         break;
@@ -77,7 +89,7 @@ void check_mode_selector(void)
     if (j > 1) return;
     if (i == mode) return;
 
-    f_cycle_stop = true;
+    f_cycle_run = false;
     mode = i;
 }
 
@@ -101,14 +113,14 @@ void guard_task(void)
         if (gc < 5) break;
         f_guard_chk = true;
         kill_timer(TMR_GUARD);
-        state.error = e_success;
+        state.err[2] = e_success;
         break;
     }
 
     if (get_timer(TMR_GUARD) == 0)
     {
-        if (gc == 3) state.error = e_guard_57;
-        if (gc == 4) state.error = e_guard_56;
+        if (gc == 3) state.err[2] = e_guard_57;
+        if (gc == 4) state.err[2] = e_guard_56;
         gc = 0;
     }
 
@@ -120,7 +132,7 @@ void engine_enable(bool e)
     if (e == false)
     {
         ENGINE(OFF);
-        set_hydro(0);
+        set_hydro_u(0);
         return;
     }
     if (!engine_ready(&state)) return;
@@ -140,15 +152,15 @@ void engine_task(void)
             if (!f_ready) break;
             if (!f_power_on)
             {
-                state.error = e_not_powered;
+                state.err[1] = e_not_powered;
                 break;
             }
-            state.error = e_success;
+            state.err[1] = e_success;
             engine_state = 10;
             break;
         }
         if (!f_engine_on) break;
-        if (check_kn(KH13, S_KH13) > 0)
+        if (check_kn(KH13, S_KH13) > 0) // check inversion
         {
             if (state.oper != o_idle) break;
             engine_state = 20;
@@ -157,7 +169,7 @@ void engine_task(void)
         if (!f_power_on)
         {
             stop();
-            state.error = e_not_powered;
+            state.err[1] = e_not_powered;
             state.oper = o_idle;
             engine_state = 20;
             break;
@@ -165,15 +177,15 @@ void engine_task(void)
         if (!RD)
         {
             stop();
-            state.error = e_engine_not_ready;
+            state.err[1] = e_engine_not_ready;
             state.oper = o_idle;
             engine_state = 20;
             break;
         }
         if (OT)
         {
-            state.error = e_engine_overheat;
-            f_cycle_stop = true;
+            state.err[1] = e_engine_overheat;
+            f_cycle_run = false;
             FAIL(ON);
             engine_state = 1;
             break;
@@ -184,7 +196,7 @@ void engine_task(void)
         engine_state = 20;
         break;
     case 10:
-        set_hydro(0);
+        set_hydro_u(0);
         KM10(ON);
         set_timer(TMR_ENGINE, 3000);
         engine_state = 11;
@@ -201,12 +213,12 @@ void engine_task(void)
             f_engine_on = true;
             f_guard_chk = false;
             engine_enable(true);
-            state.error = e_success;
+            state.err[1] = e_success;
             engine_state = 0;
             break;
         }
         if (get_timer(TMR_ENGINE)) break;
-        state.error = e_engine_not_ready;
+        state.err[1] = e_engine_not_ready;
         engine_state = 20;
         break;
     case 20:
@@ -251,12 +263,13 @@ void lub_task(void)
     case 2:
         if (BK58)
         {
-            state.error = e_lub_low;
+            state.err[1] = e_lub_low;
             //f_cycle_stop = true;
             FAIL(ON);
             lub_state = 8;
             break;
         }
+        state.err[1] = e_success;
         set_timer(TMR_LUB, (uint32_t) (workset.lub_time) * 1000);
         KM7(ON);
         lub_state = 4;
@@ -297,7 +310,7 @@ int main(void)
     tcp_conn_cb_register(tcp_conn_cb);
     tcp_rx_cb_register(tcp_rx_cb);
 
-    uart_print("\fHarware init complete\r\n");
+    uart_print("\fHardware init complete\r\n");
     uart_printf("Board: %s\r\n", brd_id());
     uart_printf("Machine: %s\r\n", msg_machine);
     uart_printf("Version: %s\r\n", msg_version);
@@ -327,7 +340,7 @@ int main(void)
     f_guard_ok = false;
     f_engine_on = false;
     f_heat_on = false;
-    f_cycle_stop = false;
+    f_cycle_run = false;
     f_cycle_report = false;
 
     dio_init();
@@ -345,11 +358,10 @@ int main(void)
 
     state.mode = m_unknown;
     state.oper = o_idle;
-    state.error = e_success;
+    for(r = 0; r < 4; r++) state.err[0] = e_success;
 
-    state.prod_id = 0;
-    state.user_id = 0;
-    state.user_cf = 0;
+    state.job.id = 0;
+    state.job.count = 0;
 
     if (is_wdt_rst())
     {
@@ -407,20 +419,20 @@ int main(void)
             {
                 stop();
                 ENGINE(OFF);
-                state.error = e_emergency_stop;
+                state.err[3] = e_emergency_stop;
                 state.oper = o_idle;
             }
         }
         if (r > 0)
         {
-            state.error = e_success;
+            state.err[3] = e_success;
             f_ready = true;
             RDY(ON);
         }
 
         if ((check_kn(KH0, S_KH0) > 0) && !KH10)
         {
-            state.error = e_emergency_stop;
+            state.err[3] = e_emergency_stop;
         }
 
         if (check_kn(CE, S_CE) > 0) pwr_count++;
@@ -434,13 +446,7 @@ int main(void)
             snprintf(buf, sizeof (buf) - 1, "%hu", tcpip_get_id());
             tcpip_send(buf);
             tcpip_send(",\"p_id\":");
-            snprintf(buf, sizeof (buf) - 1, "%hu", state.prod_id);
-            tcpip_send(buf);
-            tcpip_send(",\"u_id\":");
-            snprintf(buf, sizeof (buf) - 1, "%hu", state.user_id);
-            tcpip_send(buf);
-            tcpip_send(",\"u_cf\":");
-            snprintf(buf, sizeof (buf) - 1, "%hu", state.user_cf);
+            snprintf(buf, sizeof (buf) - 1, "%hu", state.job.id);
             tcpip_send(buf);
             tcpip_send(",\"pwr\":");
             snprintf(buf, sizeof (buf) - 1, "%lu", pwr_count - pwr_count_t);
@@ -481,7 +487,10 @@ void tcp_conn_cb(bool connected)
 
 void tcp_rx_cb(char *data, uint16_t len)
 {
-
+    char buf[20];
+    data[len] = 0;
+    if (!json_get_param("type", data, buf, sizeof(buf))) return;
+    if (!strcmp("users", buf)) ui_users_cb(data);
 }
 
 void uart_rx_cb(uint8_t b)

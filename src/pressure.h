@@ -2,8 +2,8 @@
 #ifndef PRESSURE_H
 #define PRESSURE_H
 
-double get_pressure_mpa(void);
-double get_pressure_kgf_cm2(void);
+float get_pressure_mpa(uint8_t ch);
+float get_pressure_kg(uint8_t ch);
 
 #endif /* PRESSURE_H */
 

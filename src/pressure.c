@@ -1,7 +1,7 @@
 
 #include "hal.h"
 
-const double press_u[] = {
+const float press_u[] = {
     3.41, 0,
     2.43, 40,
     1.44, 80,
@@ -10,10 +10,11 @@ const double press_u[] = {
     0, 165,
 };
 
-double get_pressure_mpa(void)
+float get_pressure_mpa(uint8_t ch)
 {
     int i;
-    double r = get_adc_u(6);
+    if (ch > 1) return 0;
+    float r = get_adc_u(6 + ch);
     for (i = 0; press_u[i] > r; i += 2);
     if (i < 2) return press_u[1];
     r = (r - press_u[i]) / (press_u[i - 2] - press_u[i]);
@@ -21,7 +22,7 @@ double get_pressure_mpa(void)
     return press_u[i + 1] - r;
 }
 
-double get_pressure_kgf_cm2(void)
+float get_pressure_kg(uint8_t ch)
 {
-    return get_pressure_mpa() * 10.19716213;
+    return get_pressure_mpa(ch) * 10.19716213;
 }

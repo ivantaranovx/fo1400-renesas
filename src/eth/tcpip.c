@@ -38,19 +38,30 @@ const uint8_t IPSET_DEF[] = {
 static int state = 0;
 static int err;
 static struct uip_conn *conn = 0;
-static int tcpflags;
 static int conndly = 0;
 static bool lnk = false;
 static tcp_conn_cb_func tcp_conn_cb = 0;
 static tcp_rx_cb_func tcp_rx_cb = 0;
 
-#define tcp_ring_buf_sz 1024
-static uint8_t tcp_ring_buf[1024];
-static uint8_t *tcp_in_ptr = tcp_ring_buf;
-static uint8_t *tcp_out_ptr = tcp_ring_buf;
-static int tlen = 0;
+#define tcp_buf_sz 1024
+static uint8_t tcp_buf[tcp_buf_sz];
+static uint16_t tcp_idx = 0;
 
 IPSET ipset;
+
+char *uip_flags_str(uint8_t flags, char *buf, size_t buf_sz)
+{
+    memset(buf, 0, buf_sz);
+    if (flags & UIP_ACKDATA) strlcat(buf, " UIP_ACKDATA", buf_sz);
+    if (flags & UIP_NEWDATA) strlcat(buf, " UIP_NEWDATA", buf_sz);
+    if (flags & UIP_REXMIT) strlcat(buf, " UIP_REXMIT", buf_sz);
+    if (flags & UIP_POLL) strlcat(buf, " UIP_POLL", buf_sz);
+    if (flags & UIP_CLOSE) strlcat(buf, " UIP_CLOSE", buf_sz);
+    if (flags & UIP_ABORT) strlcat(buf, " UIP_ABORT", buf_sz);
+    if (flags & UIP_CONNECTED) strlcat(buf, " UIP_CONNECTED", buf_sz);
+    if (flags & UIP_TIMEDOUT) strlcat(buf, " UIP_TIMEDOUT", buf_sz);
+    return buf;
+}
 
 uint16_t tcpip_get_id(void)
 {
@@ -117,7 +128,6 @@ void tcpip_task(void)
         }
 
         conn = 0;
-        tcpflags = -1;
         err = 0;
 
         enc28j60Init(ipset.mac);
@@ -142,6 +152,7 @@ void tcpip_task(void)
 
     case 4:
 
+        uip_len = 0;
         if (eth_int())
         {
             uip_len = enc28j60PacketReceive(UIP_BUFSIZE, (uint8_t *) uip_buf);
@@ -169,6 +180,7 @@ void tcpip_task(void)
             }
         }
 
+
         if (get_timer(TMR_ARP) < 0)
         {
             set_timer(TMR_ARP, 10000);
@@ -177,7 +189,7 @@ void tcpip_task(void)
 
         if (get_timer(TMR_UIP) < 0)
         {
-            set_timer(TMR_UIP, 100);
+            set_timer(TMR_UIP, 200);
 
             i = enc28j60getrev();
             if ((i == 0) || (i == 0xFF))
@@ -212,16 +224,6 @@ void tcpip_task(void)
                 conn = uip_connect(&ipaddr, HTONS(SRV_PORT));
             }
 
-            if (tcpflags != conn->tcpstateflags)
-            {
-                tcpflags = conn->tcpstateflags;
-                if (tcpflags == 0)
-                {
-                    conn = 0;
-                    conndly = 10;
-                }
-            }
-
         }
         break;
     }
@@ -230,11 +232,9 @@ void tcpip_task(void)
 bool tcpip_send(char *str)
 {
     if (!tcpip_connected()) return false;
-    while (*str)
-    {
-        *(tcp_in_ptr++) = *(str++);
-        if (tcp_in_ptr >= &tcp_ring_buf[tcp_ring_buf_sz]) tcp_in_ptr = tcp_ring_buf;
-    }
+    size_t len = strlen(str);
+    memcpy(&tcp_buf[tcp_idx], str, len);
+    tcp_idx += len;
     return true;
 }
 
@@ -250,6 +250,8 @@ void tcp_rx_cb_register(tcp_rx_cb_func f)
 
 void uip_appcall(void)
 {
+    char buf[100];
+
     if (uip_connected())
     {
         if (tcp_conn_cb) tcp_conn_cb(true);
@@ -260,27 +262,36 @@ void uip_appcall(void)
         if (tcp_conn_cb) tcp_conn_cb(false);
     }
 
-    if (uip_newdata())
+    if (uip_aborted() | uip_timedout() | uip_closed())
     {
-        if (uip_len > 0)
-        {
-            if (tcp_rx_cb) tcp_rx_cb(uip_appdata, uip_len);
-        }
+        conn = 0;
+        conndly = 50;
     }
 
-    if (!lnk) uip_abort();
+    if (uip_newdata())
+    {
+        if ((uip_len > 0) && tcp_rx_cb) tcp_rx_cb(uip_appdata, uip_len);
+    }
 
     if (uip_poll())
     {
-        char *p = uip_appdata;
-        uip_len = 0;
-        while (tcp_out_ptr != tcp_in_ptr)
-        {
-            *(p++) = *(tcp_out_ptr++);
-            uip_len++;
-            if (tcp_out_ptr >= &tcp_ring_buf[tcp_ring_buf_sz]) tcp_out_ptr = tcp_ring_buf;
-        }
-        uip_send(uip_appdata, uip_len);
+        if (tcp_idx > 0) uip_send(tcp_buf, tcp_idx);
     }
+    else
+    {
+        uart_printf("uip_appcall: %s\r\n", uip_flags_str(uip_flags, buf, sizeof (buf)));
+    }
+
+    if (uip_rexmit())
+    {
+        if (tcp_idx > 0) uip_send(tcp_buf, tcp_idx);
+    }
+
+    if (uip_acked())
+    {
+        tcp_idx = 0;
+    }
+
+    if ((!lnk) && conn) uip_abort();
 }
 

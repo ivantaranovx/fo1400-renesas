@@ -20,7 +20,7 @@ ABKEYS;
 static uint8_t epos;
 static uint8_t edot;
 static uint8_t idx;
-static char buf[STR_MAX_LENGTH + 1];
+static char zbuf[STR_MAX_LENGTH + 1];
 
 static ABKEYS abkeys[] = {
     {'1', '0', '9'},
@@ -98,38 +98,62 @@ bool check_int(int val, int *store)
     return true;
 }
 
+bool check_uint16(uint16_t val, uint16_t *store)
+{
+    if (val == *store) return false;
+    *store = val;
+    return true;
+}
+
+bool check_uint32(uint32_t val, uint32_t *store)
+{
+    if (val == *store) return false;
+    *store = val;
+    return true;
+}
+
 void print_uint(uint8_t pos, uint16_t val, uint8_t dot)
 {
-    snprintf(buf, sizeof (buf), "%05u", val);
+    char buf[10];
+    snprintf(buf, 10, "%05u", val);
     lcd_printd(pos, buf, dot);
 }
 
-void ui_input_int(uint8_t pos, uint16_t *val, uint8_t dot)
+void ui_input_int(uint8_t pos, uint16_t val, uint8_t dot)
 {
     epos = pos;
     edot = dot;
     idx = 0;
-    print_uint(pos, *val, dot);
+    snprintf(zbuf, 10, "%05u", val);
+    lcd_printd(pos, zbuf, dot);
     lcd_set_cursor(epos, 1);
 }
 
 int ui_input_int_process(uint8_t key)
 {
-    if (key == '#') return 2;
-    if (key == '*') return 1;
+    if (key == '#')
+    {
+        lcd_set_cursor(-1, 0);
+        return 2;
+    }
+    if (key == '*')
+    {
+        lcd_set_cursor(-1, 0);
+        return 1;
+    }
     if ((key >= '0') && (key <= '9'))
     {
-        buf[idx++] = key;
+        zbuf[idx++] = key;
         if (idx > 4) idx = 0;
     }
-    lcd_printd(epos, buf, edot);
+    lcd_printd(epos, zbuf, edot);
     lcd_set_cursor(epos + ((edot > 0) && (idx >= edot) ? idx + 1 : idx), 1);
     return 0;
 }
 
 void ui_input_int_get(uint16_t *res)
 {
-    long int r = atol(buf);
+    long int r = atol(zbuf);
     if (r > UINT16_MAX) r = UINT16_MAX;
     *res = r;
 }

@@ -9,7 +9,7 @@
 
 void stop(void)
 {
-    set_hydro(0);
+    set_hydro_u(0);
 
     EM18(OFF);
     EM29(OFF);
@@ -30,7 +30,7 @@ void stop(void)
     EM41(OFF);
 }
 
-void set_hydro(uint16_t speed)
+void set_hydro_u(uint16_t speed)
 {
     double dac = speed;
     dac /= 9.8039;
@@ -38,10 +38,18 @@ void set_hydro(uint16_t speed)
     set_dac(0, (uint8_t) round(dac));
 }
 
+void set_hydro_p(uint16_t pressure)
+{
+    double dac = pressure;
+    dac *= 0.627451;
+    if (dac > 255) dac = 255;
+    set_dac(1, (uint8_t) round(dac));
+}
+
 bool check_guard(MAIN_STATE *state)
 {
     if (state->flags.f.guard_ok) return true;
-    state->error = e_guard_chk;
+    state->err[2] = e_guard_chk;
     return false;
 }
 
@@ -53,7 +61,7 @@ bool engine_ready(MAIN_STATE *state)
 bool check_engine(MAIN_STATE *state)
 {
     if (engine_ready(state)) return true;
-    state->error = e_engine_off;
+    state->err[1] = e_engine_off;
     return false;
 }
 
@@ -63,7 +71,7 @@ bool check_heat(MAIN_STATE *state)
     {
         if (thermo_get_tz_state(i) < 0)
         {
-            state->error = e_not_warmed;
+            state->err[0] = e_not_warmed;
             return false;
         }
     }

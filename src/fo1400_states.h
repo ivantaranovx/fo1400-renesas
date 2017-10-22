@@ -2,12 +2,15 @@
 #ifndef FO1400_STATES_H
 #define FO1400_STATES_H
 
+#include "workset.h"
+
 typedef enum {
     m_unknown = 0,
-    m_adjust = 1,
-    m_manual = 2,
-    m_semi = 4,
-    m_auto = 8
+    m_adjust,
+    m_manual,
+    m_semi,
+    m_auto,
+    m_mode_max
 }
 MAIN_MODE;
 
@@ -39,23 +42,29 @@ MAIN_OPER;
 
 typedef enum {
     s_idle,
+    s_cycle,
+    s_cycle_t,
     s_done,
+    s_pause,
+    s_none,
+    s_junction,
     s_junction_slow,
     s_junction_full,
+    s_inj_push,
+    s_inject,
+    s_load,
+    s_decompression,
+    s_inj_pop,
+    s_disjunction,
     s_junction_break,
     s_junction_fast,
     s_junction_prev,
     s_junction_lock,
-    s_inj_push,
-    s_inject,
     s_inject_1,
     s_inject_2,
-    s_form,
-    s_load,
-    s_decompression,
-    s_inj_pop,
+    s_form_h,
+    s_form_l,
     s_cooling,
-    s_disjunction,
     s_disjunction_break,
     s_disjunction_fast,
     s_disjunction_slow,
@@ -88,12 +97,11 @@ typedef enum {
     e_err_tmr3,
     e_err_tmr6,
     e_err_tmr8,
-
 }
 MAIN_ERROR;
 
 typedef struct {
-    unsigned cycle_stop : 1;
+    unsigned cycle_run : 1;
     unsigned power_on : 1;
     unsigned guard_chk : 1;
     unsigned guard_ok : 1;
@@ -101,6 +109,7 @@ typedef struct {
     unsigned heat_on : 1;
     unsigned ready : 1;
     unsigned cycle_report : 1;
+    unsigned error : 1;
 }
 MAIN_FLAGS;
 
@@ -111,14 +120,19 @@ typedef union {
 MAIN_FLAGS_V;
 
 typedef struct {
+    uint16_t id;
+    uint16_t count;
+}
+
+PROD_JOB;
+
+typedef struct {
     MAIN_MODE mode;
     MAIN_OPER oper;
-    MAIN_STATUS status;
-    MAIN_ERROR error;
     MAIN_FLAGS_V flags;
-    uint16_t prod_id;
-    uint16_t user_id;
-    uint16_t user_cf;
+    MAIN_STATUS stat[3];
+    MAIN_ERROR err[4];
+    PROD_JOB job;
 }
 MAIN_STATE;
 

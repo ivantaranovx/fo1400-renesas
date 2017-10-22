@@ -86,7 +86,7 @@ int ui_ipaddr(char key)
             if (menu_items[idx].type == 1)
                 memcpy(buf, menu_items[idx].ptr, 4);
             if (menu_items[idx].type == 2)
-                ui_input_int(STR3_ADDR + 2, (uint16_t*) menu_items[idx].ptr, 0);
+                ui_input_int(STR3_ADDR + 2, *(uint16_t*) menu_items[idx].ptr, 0);
             edit = 1;
             key = 0;
         }

@@ -14,11 +14,21 @@ static MAIN_STATUS op_load(void);
 static MAIN_STATUS op_decompression(void);
 static MAIN_STATUS op_inj_pop(void);
 static MAIN_STATUS op_disjunction(void);
-
+static MAIN_STATUS status = s_none;
 extern WORKSET workset; // GLOBAL!
+
+#define OP_BREAK { stop(); state->oper = o_idle; run_scale_timer(TMR_SCALE_D1, false); break; }
+
+static void do_oper(MAIN_OPER oper, MAIN_STATE *state);
 
 void op_mode_adj(MAIN_STATE *state)
 {
+    if (state == 0)
+    {
+        status = s_none;
+        return;
+    }
+
     if (state->oper != (MAIN_OPER) s_idle)
     {
         if (!check_guard(state))
@@ -28,8 +38,19 @@ void op_mode_adj(MAIN_STATE *state)
         }
         if (!engine_ready(state))
         {
-            state->error = e_engine_off;
+            state->err[0] = e_engine_off;
             state->oper = o_idle;
+        }
+        if (status == s_done)
+        {
+            run_scale_timer(TMR_SCALE_D1, false);
+            state->stat[0] = s_done;
+        }
+        else
+        {
+            run_scale_timer(TMR_SCALE_D1, true);
+            state->stat[0] = s_none;
+            state->stat[1] = status;
         }
     }
 
@@ -37,22 +58,20 @@ void op_mode_adj(MAIN_STATE *state)
     {
     case o_idle:
 
-        state->status = s_idle;
+        state->stat[0] = s_idle;
 
         if (check_kn(KH1, S_KH1) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_junction;
+            do_oper(o_junction, state);
             break;
         }
         if (check_kn(KH3, S_KH3) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_inj_push;
+            do_oper(o_inj_push, state);
             break;
         }
         if (check_kn(KH5, S_KH5) > 0)
@@ -60,8 +79,7 @@ void op_mode_adj(MAIN_STATE *state)
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_inject;
+            do_oper(o_inject, state);
             break;
         }
         if (check_kn(KH6, S_KH6) > 0)
@@ -69,8 +87,7 @@ void op_mode_adj(MAIN_STATE *state)
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_load;
+            do_oper(o_load, state);
             break;
         }
         if (check_kn(KH7, S_KH7) > 0)
@@ -78,24 +95,21 @@ void op_mode_adj(MAIN_STATE *state)
             if (!check_engine(state)) break;
             if (!check_heat(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_decompression;
+            do_oper(o_decompression, state);
             break;
         }
         if (check_kn(KH4, S_KH4) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_inj_pop;
+            do_oper(o_inj_pop, state);
             break;
         }
         if (check_kn(KH2, S_KH2) > 0)
         {
             if (!check_engine(state)) break;
             if (!check_guard(state)) break;
-            state->error = e_success;
-            state->oper = o_disjunction;
+            do_oper(o_disjunction, state);
             break;
         }
         break;
@@ -103,49 +117,56 @@ void op_mode_adj(MAIN_STATE *state)
     case o_junction:
 
         if (!KH1) OP_BREAK;
-        state->status = op_junction();
+        status = op_junction();
         break;
 
     case o_inj_push:
 
         if (!KH3) OP_BREAK;
-        state->status = op_inj_push();
+        status = op_inj_push();
         break;
 
     case o_inject:
 
         if (!KH5) OP_BREAK;
-        state->status = op_inject();
+        status = op_inject();
         break;
 
     case o_load:
 
         if (!KH6) OP_BREAK;
-        state->status = op_load();
+        status = op_load();
         break;
 
     case o_decompression:
 
         if (!KH7) OP_BREAK;
-        state->status = op_decompression();
+        status = op_decompression();
         break;
 
     case o_inj_pop:
 
         if (!KH4) OP_BREAK;
-        state->status = op_inj_pop();
+        status = op_inj_pop();
         break;
 
     case o_disjunction:
 
         if (!KH2) OP_BREAK;
-        state->status = op_disjunction();
+        status = op_disjunction();
         break;
 
     default:
         break;
     }
 
+}
+
+static void do_oper(MAIN_OPER oper, MAIN_STATE *state)
+{
+    state->oper = oper;
+    state->err[0] = e_success;
+    clr_scale_timer(TMR_SCALE_D1);
 }
 
 static MAIN_STATUS op_junction(void)
@@ -157,7 +178,7 @@ static MAIN_STATUS op_junction(void)
     }
     if (!BK4)
     {
-        set_hydro(workset.hyd_U01);
+        set_hydro_u(workset.hyd_U01);
         EM16(ON);
         EM3(ON);
         EM1(ON);
@@ -166,7 +187,7 @@ static MAIN_STATUS op_junction(void)
     }
     else
     {
-        set_hydro(workset.hyd_U01);
+        set_hydro_u(workset.hyd_U01);
         EM16(ON);
         EM3(ON);
         EM1(ON);
@@ -182,7 +203,7 @@ static MAIN_STATUS op_inj_push(void)
         stop();
         return s_done;
     }
-    set_hydro(workset.hyd_U06);
+    set_hydro_u(workset.hyd_U06);
     EM16(ON);
     EM5(ON);
     EM1(ON);
@@ -197,7 +218,7 @@ static MAIN_STATUS op_inject(void)
         stop();
         return s_done;
     }
-    set_hydro(workset.hyd_U07);
+    set_hydro_u(workset.hyd_U07);
     EM16(ON);
     EM7(ON);
     EM1(ON);
@@ -211,7 +232,7 @@ static MAIN_STATUS op_load(void)
         stop();
         return s_done;
     }
-    set_hydro(workset.hyd_U10);
+    set_hydro_u(workset.hyd_U10);
     EM16(ON);
     EM2(ON);
     EM13(ON);
@@ -227,7 +248,7 @@ static MAIN_STATUS op_decompression(void)
         stop();
         return s_done;
     }
-    set_hydro(workset.hyd_U11);
+    set_hydro_u(workset.hyd_U11);
     EM16(ON);
     EM29(ON);
     EM12(ON);
@@ -242,7 +263,7 @@ static MAIN_STATUS op_inj_pop(void)
         stop();
         return s_done;
     }
-    set_hydro(workset.hyd_U13);
+    set_hydro_u(workset.hyd_U13);
     EM16(ON);
     EM6(ON);
     EM1(ON);
@@ -255,14 +276,14 @@ static MAIN_STATUS op_disjunction(void)
 
     if (BK1)
     {
-        set_hydro(0);
+        set_hydro_u(0);
         EM16(OFF);
         EM4(OFF);
         EM1(OFF);
     }
     else
     {
-        set_hydro(workset.hyd_U05);
+        set_hydro_u(workset.hyd_U05);
         EM16(ON);
         EM4(ON);
         EM1(ON);
@@ -276,10 +297,10 @@ static MAIN_STATUS op_disjunction(void)
         return s_disjunction;
     }
 
-    r1 = get_timer(TMR_14); 
+    r1 = get_timer(TMR_14);
     if (r1 == 0) EM40(OFF);
 
-    r2 = get_timer(TMR_16); 
+    r2 = get_timer(TMR_16);
     if (r2 == 0) EM41(OFF);
 
     if ((r1 > 0) || (r2 > 0)) return s_disjunction;

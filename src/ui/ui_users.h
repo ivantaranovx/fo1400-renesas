@@ -3,9 +3,7 @@
 #define UI_USERS_H
 
 int ui_users(char key);
-
-uint16_t ui_users_get_id(void);
-uint16_t ui_users_get_cf(void);
+void ui_users_cb(char *data);
 
 #endif
 

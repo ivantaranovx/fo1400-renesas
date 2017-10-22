@@ -16,6 +16,8 @@
 #include "eeprom.h"
 #include "eth/tcpip.h"
 #include "ui/ui_main.h"
+#include "ui/ui_users.h"
+#include "json.h"
 
 #include "fo1400_io.h"
 

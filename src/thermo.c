@@ -29,7 +29,7 @@ static FLAGS flags;
 static uint16_t tz_current[TZ_MAX] = {0};
 static uint16_t tz_pwm[TZ_MAX] = {0};
 
-const double thermo_res[] =
+const float thermo_res[] =
 {
     0.680, 1.000,
     0.930, 5.000,
@@ -56,7 +56,7 @@ uint16_t thermo_get_int_temp(void)
     int i;
     double u = 0;
     double t = 0;
-    double adc = get_adc_u(0);
+    float adc = get_adc_u(0);
     static uint16_t result = 0;
 
     if (adc == 0) return 0;
@@ -76,6 +76,7 @@ uint16_t thermo_get_int_temp(void)
 
     t = modf(t, &u) * 10;
     if ((t > 0) & (t < 9)) result = u;
+    if (fabs(t - result) >= 0.5) result = u;
     return result;
 }
 
@@ -85,6 +86,7 @@ void thermo_heat_enable(unsigned e)
     if (e)
     {
         clr_scale_timer(TMR_SCALE_TPWM);
+        run_scale_timer(TMR_SCALE_TPWM, true);
     }
     else
     {
@@ -114,7 +116,7 @@ void thermo_task(void)
     uint16_t tmr;
     uint16_t *temp_z = &workset.temp_Z1;
     uint16_t *pwm_z = &workset.pwm_Z1;
-    double c_temp;
+    float c_temp;
     int i;
 
     tmr = get_scale_timer(TMR_SCALE_TPWM);
@@ -131,6 +133,7 @@ void thermo_task(void)
     }
 
     clr_scale_timer(TMR_SCALE_TPWM);
+    run_scale_timer(TMR_SCALE_TPWM, true);
 
     for (i = 0; i < TZ_MAX; i++)
     {

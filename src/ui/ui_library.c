@@ -1,50 +1,53 @@
 
-#include <stdlib.h>
-#include <string.h>
-
+#include "ui_library.h"
 #include "../lcd.h"
 #include "../hal.h"
 #include "../misc.h"
 #include "../workset.h"
 #include "../eeprom.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 void save_name(uint16_t idx);
-void load_name(uint16_t idx);
 void workset_default(uint16_t idx);
 
-static const char str1[] = "Библиотека изделий";
-static const char str4[] = "3-Зап  4-Чтен #-Имя ";
+static const char str1[] = "Выбор изделия";
+static const char str4[] = "3/4/8/#";
 
-static const char str_rd[] = "Загружено";
-static const char str_wr[] = "Сохранено";
-static const char str_err[] = "Ошибка";
+static const char str_ok[] = "Ok";
+static const char str_err[] = "Err";
 
 static const char str_rma[] = "Удалить? да-A";
 static const char str_rm[] = "Удалено";
 
 extern WORKSET workset; // GLOBAL!
 
-static uint16_t p_id = 0;
-static uint16_t idx = 1;
-static uint8_t edit = 0;
-static char cname[WORKSET_NAME_LENGTH + 1];
+char name[WORKSET_NAME_LENGTH + 1];
 
-uint16_t ui_library_get_id(void)
-{
-    return p_id;
-}
+static uint8_t edit = 0;
+static uint16_t id;
+static bool select;
 
 int ui_library(char key)
 {
     if (key == 0) return 0;
 
-    if (edit == 10)
+    if (key == 'R')
     {
-        lcd_clr_str(STR3_ADDR);
+        name[WORKSET_NAME_LENGTH] = 0;
+        id = 1;
+        select = false;
+    }
+
+    if (edit == 100)
+    {
+        lcd_clr_str(STR4_ADDR);
         if (key == 'A')
         {
-            workset_default(idx);
-            lcd_print_rom(STR3_ADDR, str_rm);
+            workset_default(id);
+            print_name(id, name);
+            lcd_print_rom(STR4_ADDR, str_rm);
         }
         edit = 0;
         return 0;
@@ -52,72 +55,77 @@ int ui_library(char key)
 
     if (edit == 0)
     {
-        if (key == '*') return 1;
-        if (key == 'A') idx++;
-        if (key == 'B') idx--;
-        if (idx > WORKSET_COUNT) idx = 1;
-        if (idx == 0) idx = WORKSET_COUNT;
-        load_name(idx);
-    }
-
-    if (key == '#')
-    {
-        edit = (edit > 0) ? 0 : 1;
-        if (edit == 0)
+        if (key == '*')
         {
-            save_name(idx);
+            if (select) return id;
+            return -1;
         }
-        else
+        if (key == 'A') id++;
+        if (key == 'B') id--;
+        if (key == '#')
         {
+            edit = 1;
             lcd_clr_str(STR3_ADDR);
             lcd_clr_str(STR4_ADDR);
+            key = 0;
         }
+        if (id > WORKSET_COUNT) id = 1;
+        if (id == 0) id = WORKSET_COUNT;
+        load_name(id, name);
     }
 
-    if (edit)
+    while (edit)
     {
-        set_char(key, &cname[edit - 1]);
+        if (key == '#')
+        {
+            save_name(id);
+            edit = 0;
+            break;
+        }
+        set_char(key, &name[edit - 1]);
         if (key == '*') edit++;
-        if (key == 'C') edit++;
-        if (key == 'D') edit--;
+        if (key == 'A') edit++;
+        if (key == 'B') edit--;
         if (edit > WORKSET_NAME_LENGTH) edit = 1;
         if (edit == 0) edit = WORKSET_NAME_LENGTH;
-        print_name(idx, cname);
+        print_name(id, name);
         lcd_set_cursor(STR2_ADDR + 3 + edit, 1);
         return 0;
     }
 
     lcd_clear();
     lcd_print_rom(STR1_ADDR, str1);
-    print_name(idx, cname);
+    print_name(id, name);
     lcd_print_rom(STR4_ADDR, str4);
 
     if (key == '3')
     {
-        if (workset_save(idx))
+        if (workset_save(id))
         {
-            p_id = idx;
-            lcd_print_rom(STR3_ADDR, str_wr);
+            lcd_print_rom(STR1_ADDR + 17, str_ok);
+            select = true;
         }
         else
-            lcd_print_rom(STR3_ADDR, str_err);
+            lcd_print_rom(STR1_ADDR + 17, str_err);
     }
 
     if (key == '4')
     {
-        if (workset_load(idx))
+        if (workset_load(id))
         {
-            p_id = idx;
-            lcd_print_rom(STR3_ADDR, str_rd);
+            lcd_print_rom(STR1_ADDR + 17, str_ok);
+            save_name(0);
+            select = true;
         }
         else
-            lcd_print_rom(STR3_ADDR, str_err);
+            lcd_print_rom(STR1_ADDR + 17, str_err);
     }
 
     if (key == '8')
     {
-        lcd_print_rom(STR3_ADDR, str_rma);
-        edit = 10;
+        lcd_clr_str(STR4_ADDR);
+        lcd_print_rom(STR4_ADDR, str_rma);
+        edit = 100;
     }
 
     return 0;
@@ -127,18 +135,8 @@ void save_name(uint16_t idx)
 {
     uint16_t addr = get_workset_name_addr(idx);
     eeprom_cs(0, addr);
-    eeprom_write((uint8_t*) cname, WORKSET_NAME_LENGTH);
+    eeprom_write((uint8_t*) name, WORKSET_NAME_LENGTH);
     eeprom_status_wait();
-}
-
-void load_name(uint16_t idx)
-{
-    memset(cname, 0, sizeof (cname));
-    uint16_t addr = get_workset_name_addr(idx);
-    eeprom_cs(0, addr);
-    eeprom_read((uint8_t*) cname, WORKSET_NAME_LENGTH);
-    eeprom_status_wait();
-    trim_name(cname, WORKSET_NAME_LENGTH);
 }
 
 void workset_default(uint16_t idx)
@@ -152,6 +150,6 @@ void workset_default(uint16_t idx)
         w[i] = p;
     }
     workset_save(idx);
-    memset(cname, 0x20, sizeof (cname));
+    memset(name, 0x20, WORKSET_NAME_LENGTH);
     save_name(idx);
 }

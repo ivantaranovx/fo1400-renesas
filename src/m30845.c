@@ -4,6 +4,9 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+//#define DEBUG
 
 #define ISR __attribute__ ((interrupt))
 
@@ -22,7 +25,8 @@
 #define BUS_HI      p13
 
 static uint32_t timers[TMR_MAX];
-static uint16_t scale_timers[TMR_SCALE_MAX];
+static uint32_t scale_timers[TMR_SCALE_MAX];
+static bool scale_timers_run[TMR_SCALE_MAX];
 
 static uint16_t code = 0;
 static uint16_t adc[8];
@@ -44,7 +48,9 @@ static int i2c_status;
 
 static uint16_t enc[2] = {0};
 
+#ifdef DEBUG
 static char *tmr_names[] = {
+
     "TMR_SYS",
     "TMR_ENGINE",
     "TMR_LUB",
@@ -77,6 +83,16 @@ static char *tmr_names[] = {
     "TMR_18",
     "TMR_19",
 };
+
+static char *tmr_s_names[] = {
+
+    "TMR_SCALE_TPWM",
+
+    "TMR_SCALE_D0",
+    "TMR_SCALE_D1",
+    "TMR_SCALE_D2",
+};
+#endif
 
 /*
  * reserved memory 2 byte
@@ -140,8 +156,8 @@ const void *_var_vects[64] = {
     0, // Timer A0
     0, // Timer A1
     0, // Timer A2
-    TimerA3_ISR,  // Timer A3
-    TimerA4_ISR,  // Timer A4
+    TimerA3_ISR, // Timer A3
+    TimerA4_ISR, // Timer A4
     UART0_Tx_ISR, // UART0 Transmission, NACK
     UART0_Rx_ISR, // UART0 Reception, ACK
     UART1_Tx_ISR, // UART1 Transmission, NACK
@@ -216,6 +232,7 @@ void wdt_reset(void)
 {
     wdts = 0xff;
     pflags.rst_wdt = false;
+    p1_7 ^= 1;
 }
 
 bool is_wdt_rst(void)
@@ -240,7 +257,11 @@ void brd_init(void)
     prc0 = 0;
 
     for (int i = 0; i < TMR_MAX; i++) timers[i] = UINT32_MAX;
-    for (int i = 0; i < TMR_SCALE_MAX; i++) scale_timers[i] = UINT16_MAX;
+    for (int i = 0; i < TMR_SCALE_MAX; i++)
+    {
+        scale_timers_run[i] = false;
+        scale_timers[i] = 0;
+    }
     for (int i = 0; i < 8; i++) adc[i] = 0;
 
     // check cold startup bit
@@ -319,7 +340,7 @@ void brd_init(void)
     ckph_u0smr3 = 1;
 
     // debug port (serial1)
-    // 9600 8N1
+    // 9600 8N1 u1brg = 207;
     ps0_7 = 1;
     u1brg = 207;
     u1mr = 0b00000101;
@@ -373,6 +394,10 @@ void brd_init(void)
     wdc7 = 1;
     wdts = 0xff;
 
+    // debug port
+    p1 = 0x00;
+    pd1 = 0xff;
+
     // enable interrupts
     ta3ic = 2;
     ta4ic = 2;
@@ -417,7 +442,7 @@ void uart_print(char *buf)
 {
     while (*buf)
     {
-        while ((te_u1c1) && (uart_in_ptr == uart_out_ptr));
+        //while ((te_u1c1) && (uart_in_ptr == uart_out_ptr));
 
         *(uart_in_ptr++) = *(buf++);
         if (uart_in_ptr >= &uart_ring_buf[uart_ring_buf_sz]) uart_in_ptr = uart_ring_buf;
@@ -531,17 +556,21 @@ int i2c_io_status(void)
 
 void AD_ISR(void)
 {
+    p1_1 = 1;
+
     uint16_t *ptr = &ad00;
     for (uint8_t i = 0; i < 8; i++)
     {
         adc[i] -= adc[i] >> 4;
         adc[i] += *(ptr++) & 0x03FF;
     }
+
+    p1_1 = 0;
 }
 
-double get_adc_u(uint8_t ch)
+float get_adc_u(uint8_t ch)
 {
-    double res;
+    float res;
     res = adc[ch] >> 4;
     res *= 5;
     return res / 1023;
@@ -571,7 +600,9 @@ void TimerB0_ISR(void)
 void set_timer(TMR_NUM num, uint32_t delay)
 {
     if (num >= TMR_MAX) return;
-    if (num >= TMR_1) uart_printf("set_timer %s delay %lu\r\n", tmr_names[num], delay);
+#ifdef DEBUG
+    if (num >= TMR_1) uart_printf("set_timer %s, %lu\r\n", tmr_names[num], delay);
+#endif
     if (delay == UINT32_MAX) delay--;
     timers[num] = delay;
 }
@@ -582,31 +613,49 @@ int8_t get_timer(TMR_NUM num)
     if (timers[num] == UINT32_MAX) return -1;
     if (timers[num] > 0) return 1;
     timers[num] = UINT32_MAX;
+#ifdef DEBUG
     if (num >= TMR_1) uart_printf("timer %s is done\r\n", tmr_names[num]);
+#endif
     return 0;
 }
 
 void kill_timer(TMR_NUM num)
 {
     if (num >= TMR_MAX) return;
-    if (num >= TMR_1) uart_printf("timer %s is killed\r\n", tmr_names[num]);
+#ifdef DEBUG
+    if (num >= TMR_1) uart_printf("kill_timer %s\r\n", tmr_names[num]);
+#endif
     timers[num] = UINT32_MAX;
 }
 
 void clr_scale_timer(TMR_SCALE_NUM num)
 {
     if (num >= TMR_SCALE_MAX) return;
+#ifdef DEBUG
+    if (num >= TMR_SCALE_TPWM) uart_printf("clr_scale_timer %s\r\n", tmr_s_names[num]);
+#endif
     scale_timers[num] = 0;
 }
 
-uint16_t get_scale_timer(TMR_SCALE_NUM num)
+void run_scale_timer(TMR_SCALE_NUM num, bool run)
 {
-    if (num >= TMR_SCALE_MAX) return UINT16_MAX;
+    if (num >= TMR_SCALE_MAX) return;
+#ifdef DEBUG
+    if (num >= TMR_SCALE_TPWM) uart_printf("run_scale_timer %s, %d\r\n", tmr_s_names[num], run);
+#endif
+    scale_timers_run[num] = run;
+}
+
+uint32_t get_scale_timer(TMR_SCALE_NUM num)
+{
+    if (num >= TMR_SCALE_MAX) return 0;
     return scale_timers[num];
 }
 
 void TimerB1_ISR(void)
 {
+    p1_0 = 1;
+
     static uint8_t scan = 0x0E;
     static uint16_t pcode = 0;
     static uint16_t tcode = 0;
@@ -624,7 +673,7 @@ void TimerB1_ISR(void)
     }
     for (i = 0; i < TMR_SCALE_MAX; i++)
     {
-        if (scale_timers[i] < UINT16_MAX) scale_timers[i]++;
+        if (scale_timers_run[i] && (scale_timers[i] < UINT32_MAX)) scale_timers[i]++;
     }
 
     // keyboard scan
@@ -649,12 +698,13 @@ void TimerB1_ISR(void)
     }
 
     ad_delay++;
-    if (ad_delay > 9)
+    if (ad_delay > 24)
     {
         ad_delay = 0;
         adst_ad0con0 = 1;
     }
 
+    p1_0 = 0;
 }
 
 uint16_t get_key_code(void)
@@ -764,7 +814,7 @@ bool lcd_busy(void)
 
         if ((t & 0x08) == 0) return false;
         _delay_us(1);
-        
+
         wdts = 0xff;
     }
     return true;
@@ -842,7 +892,7 @@ void TimerA4_ISR(void)
 int32_t get_enc(uint8_t ch)
 {
     uint16_t r[2] = {0};
-    switch(ch)
+    switch (ch)
     {
     case 0:
         r[0] = ta3;
@@ -855,6 +905,6 @@ int32_t get_enc(uint8_t ch)
     default:
         break;
     }
-    return *((int32_t*)&r);
+    return *((int32_t*) & r);
 }
 

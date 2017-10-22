@@ -1,97 +1,95 @@
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "../lcd.h"
 #include "../hal.h"
 #include "../eeprom.h"
 #include "../misc.h"
 #include "../workset.h"
 #include "../eeprom.h"
+#include "../eth/tcpip.h"
+#include "../json.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <stdbool.h>
 
 static const char str1[] = "Выбор пользователя";
+static const char str2[] = "Нет связи!";
 static const char str3[] = "Тариф: ";
-static const char str4[] = "D-Выбор #-Имя";
+static const char str4[] = "C-сброс D-выбор";
 
-static uint16_t u_id = 0;
-static uint16_t u_cf = 0;
-
-static uint16_t idx = 1;
-static uint8_t edit = 0;
-
-static char cname[USER_NAME_LENGTH + 1];
-
-uint16_t ui_users_get_id(void)
-{
-    return u_id;
-}
-
-uint16_t ui_users_get_cf(void)
-{
-    return u_cf;
-}
+static bool ret = false;
+static bool srv = false;
 
 int ui_users(char key)
 {
-    int addr;
+    char buf[10];
+
+    if (ret)
+    {
+        ret = false;
+        return 2;
+    }
+
+    if (tcpip_connected() ^ srv)
+    {
+        srv = !srv;
+        key = 'R';
+    }
 
     if (key == 0) return 0;
 
-    if (edit == 0)
+    if (key == 'R')
     {
-        if (key == '*') return 1; // cancel
-        if (key == 'D')
+        lcd_clear();
+        lcd_print_rom(STR1_ADDR, str1);
+        if (srv)
         {
-            u_id = idx;
-            return 2; // select
-        }
-        if ((key >= '0') && (key <= '9')) u_cf = key - 0x30;
-        if (key == 'A') idx++;
-        if (key == 'B') idx--;
-        if (idx > USER_COUNT) idx = 1;
-        if (idx == 0) idx = USER_COUNT;
-        memset(cname, 0, sizeof (cname));
-        addr = get_user_name_addr(idx - 1);
-        eeprom_cs(0, addr);
-        eeprom_read((uint8_t*) cname, USER_NAME_LENGTH);
-        eeprom_status_wait();
-        trim_name(cname, USER_NAME_LENGTH);
-    }
-
-    if (key == '#')
-    {
-        edit = !(edit > 0);
-        if (edit == 0)
-        {
-            addr = get_user_name_addr(idx - 1);
-            eeprom_cs(0, addr);
-            eeprom_write((uint8_t*) cname, USER_NAME_LENGTH);
-            eeprom_status_wait();
+            lcd_print_rom(STR3_ADDR, str3);
+            lcd_print_rom(STR4_ADDR, str4);
+            tcpip_send("{\"type\":\"users\",\"cmd\":\"current\"}");
         }
         else
         {
-            lcd_clr_str(STR4_ADDR);
+            lcd_print_rom(STR2_ADDR, str2);
         }
     }
 
-    if (edit)
+    if (key == '*') return 1; // cancel
+
+    if (!srv) return 0;
+
+    if (key == 'A') tcpip_send("{\"type\":\"users\",\"cmd\":\"next\"}");
+    if (key == 'B') tcpip_send("{\"type\":\"users\",\"cmd\":\"prev\"}");
+    if (key == 'C') tcpip_send("{\"type\":\"users\",\"cmd\":\"clear\"}");
+    if (key == 'D') tcpip_send("{\"type\":\"users\",\"cmd\":\"select\"}");
+
+    if (isdigit((unsigned char) key))
     {
-        set_char(key, &cname[edit - 1]);
-        if (key == '*') edit++;
-        if (key == 'C') edit++;
-        if (key == 'D') edit--;
-        if (edit > USER_NAME_LENGTH) edit = 1;
-        if (edit == 0) edit = USER_NAME_LENGTH;
-        print_name(idx, cname);
-        lcd_set_cursor(STR2_ADDR + 3 + edit, 1);
-        return 0;
+        tcpip_send("{\"type\":\"users\",\"tarif\":");
+        snprintf(buf, sizeof (buf) - 1, "%hu", key - 0x30);
+        tcpip_send(buf);
+        tcpip_send("}");
     }
 
-    lcd_clear();
-    lcd_print_rom(STR1_ADDR, str1);
-    print_name(idx, cname);
-    lcd_print_rom(STR3_ADDR, str3);
-    lcd_put_char(u_cf + 0x30);
-    lcd_print_rom(STR4_ADDR, str4);
     return 0;
+}
+
+void ui_users_cb(char *data)
+{
+    char buf[50];
+    if (json_get_param("user", data, buf, sizeof(buf)) > 0)
+    {
+        lcd_clr_str(STR2_ADDR);
+        lcd_print(STR2_ADDR, buf);
+    }
+    if (json_get_param("tarif", data, buf, sizeof(buf)) > 0)
+    {
+        lcd_print(STR3_ADDR + 7, buf);
+    }
+    if (json_get_param("select", data, buf, sizeof(buf)) > 0)
+    {
+        ret = true;
+    }
 }

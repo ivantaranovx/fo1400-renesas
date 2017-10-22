@@ -1,7 +1,4 @@
 
-#include <stdint.h>
-#include <limits.h>
-
 #include "../hal.h"
 #include "../dio.h"
 #include "../lcd.h"
@@ -15,6 +12,9 @@
 #include "ui_users.h"
 #include "ui_lan.h"
 
+#include <stdint.h>
+#include <limits.h>
+
 typedef struct
 {
     int code;
@@ -24,8 +24,6 @@ MSG_TEXT;
 
 int tz_delta(uint8_t ch);
 char tz_state_sym(uint8_t ch);
-
-void clear_vars();
 
 const char *get_msg_text(int code, const MSG_TEXT *text);
 
@@ -38,28 +36,34 @@ static const MSG_TEXT msg_modes[] = {
 };
 
 static const MSG_TEXT msg_status[] = {
-    {s_idle, "Cтоп"},
+    {s_idle, "Cтоп  "},
+    {s_cycle, " Цикл "},
+    {s_cycle_t, "-Цикл-"},
     {s_done, "Готово"},
-    {s_junction_slow, "Замедл. запирание"},
-    {s_junction_full, "Полное запирание"},
-    {s_junction_break, "Страгивание"},
-    {s_junction_fast, "Смыкание ускор."},
-    {s_junction_prev, "Предохранение"},
-    {s_junction_lock, "Запирание"},
-    {s_inj_push, "Подвод  МВ"},
+    {s_pause, "Пауза "},
+    {s_none, "      "},
+    {s_junction, "Смык. "},
+    {s_junction_slow, "Смык.М"},
+    {s_junction_full, "Смык.П"},
+    {s_inj_push, "Подвод"},
     {s_inject, "Впрыск"},
-    {s_inject_1, "Впрыск 1ст."},
-    {s_inject_2, "Впрыск 2ст."},
-    {s_form, "Формование"},
-    {s_load, "Загрузка"},
-    {s_decompression, "Декомпрессия"},
-    {s_inj_pop, "Отвод МВ"},
-    {s_cooling, "Охлаждение"},
-    {s_disjunction, "Размыкание"},
-    {s_disjunction_break, "Отрыв"},
-    {s_disjunction_fast, "Размыкание ускор."},
-    {s_disjunction_slow, "Размыкание замедл."},
-    {s_jump, "Подскок"},
+    {s_load, "Загруз"},
+    {s_decompression, "Декомп"},
+    {s_inj_pop, "Отвод"},
+    {s_disjunction, "Размык"},
+    {s_junction_break, "Страг."},
+    {s_junction_fast, "Ускор."},
+    {s_junction_prev, "Пред. "},
+    {s_junction_lock, "Запир."},
+    {s_inject_1, "1 ступ"},
+    {s_inject_2, "2 ступ"},
+    {s_form_h, "Форм.B"},
+    {s_form_l, "Форм.H"},
+    {s_cooling, "Охлаж."},
+    {s_disjunction_break, "Отрыв "},
+    {s_disjunction_fast, "Ускор."},
+    {s_disjunction_slow, "Замедл"},
+    {s_jump, "Подс-к"},
 };
 
 static const MSG_TEXT msg_error[] = {
@@ -91,13 +95,22 @@ static const MSG_TEXT msg_error[] = {
 
 static const char str_temp[] = "%4i%4i%4i%4i%4i";
 static const uint8_t str_addr[] = {STR1_ADDR, STR2_ADDR, STR3_ADDR, STR4_ADDR};
+static const char str_noerr[] = "Нет ошибок";
+static const char str_nosel[] = "Не выбрано";
+
+static const TMR_SCALE_NUM tmrs[3] = {TMR_SCALE_D0, TMR_SCALE_D1, TMR_SCALE_D2};
 
 static int tz_temp[TZ_MAX];
 static int tz_int;
 static int main_mode;
 static int main_status;
-static int main_error;
 static int main_flags;
+static int main_err[4];
+static int stat[3];
+static uint32_t tmr[3];
+static uint16_t prod_id;
+static uint16_t prod_cnt;
+static int edit = 0;
 
 typedef enum
 {
@@ -111,13 +124,16 @@ typedef enum
     scr_ipaddr,
     scr_inputs,
     scr_outputs,
-    scr_chars
+    scr_chars,
+    scr_errors,
 }
 SCREEN;
 
 static int screen = scr_return;
 
 extern WORKSET workset; // GLOBAL!
+
+void clr_stat_tmr(void);
 
 void ui_task(MAIN_STATE *state)
 {
@@ -131,7 +147,7 @@ void ui_task(MAIN_STATE *state)
     set_timer(TMR_UI, 100);
 
     key = get_key();
-    while (1)
+    for (;;) // autorepeat
     {
         if (key != keytmp)
         {
@@ -158,28 +174,28 @@ void ui_task(MAIN_STATE *state)
         if (check_int(state->mode, &main_mode))
         {
             lcd_print_rom(STR1_ADDR, get_msg_text(main_mode, msg_modes));
-        }
-
-        if (check_int(state->status, &main_status))
-        {
-            lcd_clr_str(STR2_ADDR);
-            lcd_print_rom(STR2_ADDR, get_msg_text(main_status, msg_status));
-        }
-
-        if (check_int(state->error, &main_error))
-        {
-            lcd_clr_str(STR4_ADDR);
-            lcd_print_rom(STR4_ADDR, get_msg_text(main_error, msg_error));
+            clr_stat_tmr();
         }
 
         if (check_int(thermo_get_int_temp(), &tz_int))
         {
-            lcd_printf(STR1_ADDR + 7, "%2iC", tz_int);
+            lcd_printf(STR1_ADDR + 7, "%2i", tz_int);
+        }
+
+        state->flags.f.error = false;
+        for (i = 0; i < 4; i++)
+        {
+            if (state->err[i] != e_success)
+            {
+                state->flags.f.error = true;
+                break;
+            }
         }
 
         if (check_int(state->flags.v, &main_flags))
         {
-            lcd_set_cursor(STR1_ADDR + 11, 0);
+            lcd_set_cursor(STR1_ADDR + 10, 0);
+            lcd_put_char(state->flags.f.error ? 'E' : '_');
             lcd_put_char(state->flags.f.power_on ? 'P' : '_');
             lcd_put_char(state->flags.f.engine_on ? 'M' : '_');
             lcd_put_char(state->flags.f.guard_ok ? 'S' : '_');
@@ -195,21 +211,60 @@ void ui_task(MAIN_STATE *state)
             }
         }
 
+        for (i = 0; i < 3; i++)
+        {
+            if (check_int(state->stat[i], &stat[i]))
+                lcd_print_rom(STR2_ADDR + (i * 7), get_msg_text(stat[i], msg_status));
+
+            if (state->mode == m_unknown) continue;
+
+            if (i == 0)
+            {
+                if (state->mode == m_adjust) continue;
+                if (state->mode == m_manual) continue;
+            }
+
+            if (check_uint32(get_scale_timer(tmrs[i]), &tmr[i]))
+                print_uint(STR3_ADDR + (i * 7), tmr[i] / 100, 4);
+        }
+
+        if (check_uint16(state->job.id, &prod_id))
+        {
+            char name[WORKSET_NAME_LENGTH + 1];
+            load_name(prod_id, name);
+            // WORKSET_NAME_LENGTH
+            lcd_printf(STR4_ADDR, "%14.14s", name);
+        }
+
+        if (check_uint16(state->job.count, &prod_cnt))
+            print_uint(STR4_ADDR + 15, prod_cnt, 0);
+
+        if (edit)
+        {
+            i = ui_input_int_process(key);
+            if (i > 0)
+            {
+                if (i == 2) ui_input_int_get(&state->job.count);
+                edit = 0;
+                prod_cnt = state->job.count ^ 1;
+            }
+            break;
+        }
+
         switch (key)
         {
-
         case '1':
 
             lcd_clear();
-            ui_library(0xFF);
-            screen = scr_library;
+            ui_users('R');
+            screen = scr_users;
             break;
 
         case '2':
 
             lcd_clear();
-            ui_users(0xFF);
-            screen = scr_users;
+            ui_library('R');
+            screen = scr_library;
             break;
 
         case '4':
@@ -221,7 +276,7 @@ void ui_task(MAIN_STATE *state)
         case '5':
 
             lcd_clear();
-            ui_ipaddr(0xFF);
+            ui_ipaddr('R');
             screen = scr_ipaddr;
             break;
 
@@ -255,7 +310,7 @@ void ui_task(MAIN_STATE *state)
         case '*':
 
             lcd_clear();
-            ui_settings(0xFF);
+            ui_settings('R');
             screen = scr_settings;
             break;
 
@@ -265,6 +320,17 @@ void ui_task(MAIN_STATE *state)
             main_mode = 0;
             main_status = 1;
             screen = scr_chars;
+            break;
+
+        case 'A':
+            lcd_clear();
+            screen = scr_errors;
+            break;
+
+        case '#':
+            if (state->flags.f.cycle_run) break;
+            ui_input_int(STR4_ADDR + 15, state->job.count, 0);
+            edit = 1;
             break;
 
         }
@@ -289,8 +355,8 @@ void ui_task(MAIN_STATE *state)
     case scr_analog:
 
         lcd_clr_str(STR1_ADDR);
-        lcd_printf(STR1_ADDR, "P1 %05.1f kgf", get_pressure_kgf_cm2());
-        lcd_printf(STR2_ADDR, "P2");
+        lcd_printf(STR1_ADDR, "P1 %05.1f кгс", get_pressure_kg(0));
+        lcd_printf(STR2_ADDR, "P2 %05.1f кгс", get_pressure_kg(1));
         lcd_printf(STR3_ADDR, "Y1 %*ld", 11, get_enc(0));
         lcd_printf(STR4_ADDR, "Y2 %*ld", 11, get_enc(1));
 
@@ -360,16 +426,19 @@ void ui_task(MAIN_STATE *state)
 
     case scr_library:
 
-        if (!ui_library(key)) break;
-        state->prod_id = ui_library_get_id();
+        i = ui_library(key);
+        if (i == 0) break;
+        if (i > 0)
+        {
+            state->job.id = i;
+            state->job.count = 0;
+        }
         screen = scr_return;
         break;
 
     case scr_users:
 
         if (!ui_users(key)) break;
-        state->user_id = ui_users_get_id();
-        state->user_cf = ui_users_get_cf();
         screen = scr_return;
         break;
 
@@ -418,15 +487,50 @@ void ui_task(MAIN_STATE *state)
         }
         break;
 
+    case scr_errors:
+
+        if (key == '*')
+        {
+            screen = scr_return;
+            break;
+        }
+        for (i = 0; i < 4; i++)
+        {
+            if (!check_int(state->err[i], &main_err[i])) continue;
+            lcd_clr_str(str_addr[i]);
+            lcd_print_rom(str_addr[i], get_msg_text(main_err[i], msg_error));
+        }
+        break;
+
     case scr_return:
 
+        for (i = 0; i < TZ_MAX; i++) tz_temp[i] = INT_MIN;
+        for (i = 0; i < 4; i++) main_err[i] = INT_MIN;
+        tz_int = INT_MIN;
+        main_mode = INT_MIN;
+        main_status = INT_MIN;
+        main_flags = INT_MIN;
+        prod_id = UINT16_MAX;
+        prod_cnt = state->job.count ^ 1;
+        clr_stat_tmr();
+
         lcd_clear();
-        clear_vars();
         screen = scr_main;
         break;
 
     }
 
+}
+
+void clr_stat_tmr(void)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        stat[i] = INT_MIN;
+        tmr[i] = UINT32_MAX;
+    }
+    lcd_clr_str(STR2_ADDR);
+    lcd_clr_str(STR3_ADDR);
 }
 
 int tz_delta(uint8_t ch)
@@ -445,21 +549,10 @@ char tz_state_sym(uint8_t ch)
     return '=';
 }
 
-void clear_vars()
-{
-    for (int i = 0; i < TZ_MAX; i++) tz_temp[i] = INT_MIN;
-    tz_int = INT_MIN;
-    main_mode = INT_MIN;
-    main_status = INT_MIN;
-    main_error = INT_MIN;
-    main_flags = INT_MIN;
-}
-
 const char *get_msg_text(int code, const MSG_TEXT *text)
 {
-    for (int i = 0;; i++)
+    for (int i = 0; text[i].msg > 0; i++)
     {
-        if (text[i].msg == 0) break;
         if (text[i].code == code) return text[i].msg;
     }
     return "Undefined";

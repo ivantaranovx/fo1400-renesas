@@ -15,8 +15,10 @@ void print_uint(uint8_t pos, uint16_t val, uint8_t dot);
 void print_ex(uint8_t pos, uint8_t type, void *ptr);
 
 bool check_int(int val, int *store);
+bool check_uint16(uint16_t val, uint16_t *store);
+bool check_uint32(uint32_t val, uint32_t *store);
 
-void ui_input_int(uint8_t pos, uint16_t *val, uint8_t dot);
+void ui_input_int(uint8_t pos, uint16_t val, uint8_t dot);
 int ui_input_int_process(uint8_t key);
 void ui_input_int_get(uint16_t *res);
 

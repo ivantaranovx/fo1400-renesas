@@ -2,13 +2,12 @@
 #ifndef FO1400_COMMON_H
 #define FO1400_COMMON_H
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #include "fo1400_states.h"
 
+#include <stdbool.h>
+
 #define f_ready         state.flags.f.ready
-#define f_cycle_stop    state.flags.f.cycle_stop
+#define f_cycle_run     state.flags.f.cycle_run
 #define f_cycle_report  state.flags.f.cycle_report
 #define f_heat_on       state.flags.f.heat_on
 #define f_power_on      state.flags.f.power_on
@@ -16,12 +15,12 @@
 #define f_guard_ok      state.flags.f.guard_ok
 #define f_engine_on     state.flags.f.engine_on
 
-#define OP_BREAK { stop(); state->oper = o_idle; break; }
-#define STOP_ERR(e) { stop(); state->oper = o_idle; state->error = e; }
-#define BREAK_ERR(e) { stop(); state->oper = o_idle; state->error = e; break; }
+#define STOP_ERR(e) { stop(); state->oper = o_idle; state->err[0] = e; }
+#define BREAK_ERR(e) { stop(); state->oper = o_idle; state->err[0] = e; break; }
 
 void stop(void);
-void set_hydro(uint16_t speed);
+void set_hydro_u(uint16_t speed);
+void set_hydro_p(uint16_t pressure);
 
 bool engine_ready(MAIN_STATE *state);
 

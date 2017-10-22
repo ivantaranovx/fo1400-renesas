@@ -44,7 +44,7 @@ unsigned lcd_clear(void)
     return 0;
 }
 
-unsigned lcd_clr_str(uint8_t pos)
+unsigned lcd_clr_str(int pos)
 {
     uint8_t i;
     if (lcd_set_cursor(pos, 0)) return 1;
@@ -55,12 +55,13 @@ unsigned lcd_clr_str(uint8_t pos)
     return 0;
 }
 
-unsigned lcd_set_cursor(uint8_t pos, unsigned show)
+unsigned lcd_set_cursor(int pos, unsigned show)
 {
     lcd_set_rs(0);
     if (show) lcd_write(0x0E);
     else lcd_write(0x0C);
     if (lcd_busy()) return 1;
+    if (pos < 0) return 0;
     lcd_write(0x80 | pos);
     if (lcd_busy()) return 1;
     return 0;
@@ -74,7 +75,7 @@ unsigned lcd_put_char(char c)
     return 0;
 }
 
-unsigned lcd_printd(uint8_t pos, char *buf, uint8_t dot)
+unsigned lcd_printd(int pos, char *buf, uint8_t dot)
 {
     uint8_t p = 0;
     char c;
@@ -90,13 +91,13 @@ unsigned lcd_printd(uint8_t pos, char *buf, uint8_t dot)
     return 0;
 }
 
-unsigned lcd_print_rom(uint8_t pos, const char *buf)
+unsigned lcd_print_rom(int pos, const char *buf)
 {
     if (buf == 0) return 1;
     return lcd_print(pos, (char*) buf);
 }
 
-void lcd_printf(unsigned char pos, const char *fmt, ...)
+void lcd_printf(int pos, const char *fmt, ...)
 {
     va_list args;
     char buf[STR_MAX_LENGTH + 1];

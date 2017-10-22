@@ -15,6 +15,12 @@ static bool f_inj_pop = true;
 void op_mode_auto(MAIN_STATE *state)
 {
     int r;
+ 
+    if (state == 0)
+    {
+
+        return;
+    }
 
     if (state->oper != (MAIN_OPER) s_idle)
     {
@@ -25,20 +31,22 @@ void op_mode_auto(MAIN_STATE *state)
         }
         if (!engine_ready(state))
         {
-            state->error = e_engine_off;
+            state->err[0] = e_engine_off;
             state->oper = o_idle;
         }
+        if (state->flags.f.cycle_run) state->stat[0] = s_cycle_t;
     }
 
     switch (state->oper)
     {
     case o_idle:
 
+        state->stat[0] = s_idle;
+
         r = check_kn(KH1, S_KH1);
 
         if (state->mode == m_semi)
         {
-            state->status = s_idle;
             if (r <= 0) break;
         }
 
@@ -46,11 +54,11 @@ void op_mode_auto(MAIN_STATE *state)
         {
             if (r > 0)
             {
-                state->error = e_success;
-                state->flags.f.cycle_stop = false;
+                state->err[0] = e_success;
+                state->flags.f.cycle_run = true;
             }
-            if (state->error != e_success) break;
-            if (state->flags.f.cycle_stop) break;
+            if (state->err[0] != e_success) break;
+            if (!state->flags.f.cycle_run) break;
         }
 
         if (!check_engine(state)) break;
@@ -59,18 +67,26 @@ void op_mode_auto(MAIN_STATE *state)
 
         if (!BK53)
         {
-            state->error = e_err_bk53;
+            state->err[0] = e_err_bk53;
             break;
         }
 
-        state->oper = o_junction_break;
-        state->error = e_success;
         set_timer(TMR_1, (uint32_t)(workset.tmr_T01) * 10);
+        state->err[0] = e_success;
+        state->stat[0] = s_cycle;
+        state->stat[1] = s_junction;
+        state->oper = o_junction_break;
+        clr_scale_timer(TMR_SCALE_D0);
+        clr_scale_timer(TMR_SCALE_D1);
+        clr_scale_timer(TMR_SCALE_D2);
+        run_scale_timer(TMR_SCALE_D0, true);
+        run_scale_timer(TMR_SCALE_D1, true);
+        run_scale_timer(TMR_SCALE_D2, true);
         break;
 
     case o_junction_break:
-        state->status = s_junction_break;
-        set_hydro(workset.hyd_U01);
+        state->stat[2] = s_junction_break;
+        set_hydro_u(workset.hyd_U01);
         EM3(ON);
         EM16(ON);
         EM29(ON);
@@ -79,11 +95,12 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK52) break;
         stop();
         state->oper = o_junction_fast;
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_junction_fast:
-        state->status = s_junction_fast;
-        set_hydro(workset.hyd_U02);
+        state->stat[2] = s_junction_fast;
+        set_hydro_u(workset.hyd_U02);
         EM3(ON);
         EM16(ON);
         EM29(ON);
@@ -93,11 +110,12 @@ void op_mode_auto(MAIN_STATE *state)
         stop();
         state->oper = o_junction_prev;
         set_timer(TMR_2, (uint32_t)(workset.tmr_T02) * 10);
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_junction_prev:
-        state->status = s_junction_prev;
-        set_hydro(workset.hyd_U03);
+        state->stat[2] = s_junction_prev;
+        set_hydro_u(workset.hyd_U03);
         EM3(ON);
         EM18(ON);
         EM1(ON);
@@ -106,11 +124,12 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK4) break;
         stop();
         state->oper = o_junction_lock;
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_junction_lock:
-        state->status = s_junction_lock;
-        set_hydro(workset.hyd_U04);
+        state->stat[2] = s_junction_lock;
+        set_hydro_u(workset.hyd_U04);
         EM3(ON);
         EM16(ON);
         EM1(ON);
@@ -119,13 +138,16 @@ void op_mode_auto(MAIN_STATE *state)
         stop();
         set_timer(TMR_HYD, 200);
         state->oper = o_inj_push;
+        clr_scale_timer(TMR_SCALE_D1);
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_inj_push:
         if (f_inj_pop)
         {
-            state->status = s_inj_push;
-            set_hydro(workset.hyd_U06);
+            state->stat[1] = s_inj_push;
+            state->stat[2] = s_none;
+            set_hydro_u(workset.hyd_U06);
             EM5(ON);
             EM16(ON);
             EM1(ON);
@@ -133,31 +155,34 @@ void op_mode_auto(MAIN_STATE *state)
             if (!BK20) BREAK_ERR(e_err_bk20);
             if (!BK22) break;
             stop();
+            clr_scale_timer(TMR_SCALE_D1);
+            clr_scale_timer(TMR_SCALE_D2);
         }
         state->oper = o_inject_1;
+        state->stat[1] = s_inject;
         set_timer(TMR_3, (uint32_t)(workset.tmr_T03) * 10);
-        clr_scale_timer(TMR_SCALE_INJECT);
         uart_print("inj start\r\n");
         break;
 
     case o_inject_1:
-        state->status = s_inject_1;
-        set_hydro(workset.hyd_U07);
+        state->stat[2] = s_inject_1;
+        set_hydro_u(workset.hyd_U07);
         EM5(ON);
         EM16(ON);
         EM7(ON);
         EM1(ON);
         if (!BK2) BREAK_ERR(e_err_bk2);
         if (!BK22) BREAK_ERR(e_err_bk22);
-        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_INJECT), get_pressure_mpa());
+        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_D2), get_pressure_mpa(0));
         if (!BK24) break;
         stop();
         state->oper = o_inject_2;
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_inject_2:
-        state->status = s_inject_2;
-        set_hydro(workset.hyd_U08);
+        state->stat[2] = s_inject_2;
+        set_hydro_u(workset.hyd_U08);
         EM5(ON);
         EM16(ON);
         EM7(ON);
@@ -165,17 +190,19 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK2) BREAK_ERR(e_err_bk2);
         if (!BK22) BREAK_ERR(e_err_bk22);
         if (get_timer(TMR_3) < 0) BREAK_ERR(e_err_tmr3);
-        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_INJECT), get_pressure_mpa());
+        uart_printf("inj %u %f\r\n", get_scale_timer(TMR_SCALE_D2), get_pressure_mpa(0));
         if (!BK23) break;
         uart_print("inj stop\r\n");
         stop();
         state->oper = o_form_hi;
         set_timer(TMR_10, (uint32_t)(workset.tmr_T10) * 10);
+        clr_scale_timer(TMR_SCALE_D1);
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_form_hi:
-        state->status = s_form;
-        set_hydro(workset.hyd_U15);
+        state->stat[2] = s_form_h;
+        set_hydro_u(workset.hyd_U15);
         EM5(ON);
         EM16(ON);
         EM7(ON);
@@ -186,11 +213,12 @@ void op_mode_auto(MAIN_STATE *state)
         stop();
         state->oper = o_form;
         set_timer(TMR_4, (uint32_t)(workset.tmr_T04) * 10);
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_form:
-        state->status = s_form;
-        set_hydro(workset.hyd_U09);
+        state->stat[2] = s_form_l;
+        set_hydro_u(workset.hyd_U09);
         EM5(ON);
         EM16(ON);
         EM7(ON);
@@ -203,11 +231,14 @@ void op_mode_auto(MAIN_STATE *state)
         state->oper = o_load;
         set_timer(TMR_5, (uint32_t)(workset.tmr_T05) * 10);
         set_timer(TMR_6, (uint32_t)(workset.tmr_T06) * 10);
+        clr_scale_timer(TMR_SCALE_D1);
+        clr_scale_timer(TMR_SCALE_D2);
         break;
 
     case o_load:
-        state->status = s_load;
-        set_hydro(workset.hyd_U10);
+        state->stat[1] = s_load;
+        state->stat[2] = s_cooling;
+        set_hydro_u(workset.hyd_U10);
         EM2(ON);
         EM16(ON);
         EM13(ON);
@@ -219,11 +250,12 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK25) break;
         stop();
         state->oper = o_decompression;
+        clr_scale_timer(TMR_SCALE_D1);
         break;
 
     case o_decompression:
-        state->status = s_decompression;
-        set_hydro(workset.hyd_U11);
+        state->stat[1] = s_decompression;
+        set_hydro_u(workset.hyd_U11);
         EM29(ON);
         EM16(ON);
         EM12(ON);
@@ -234,14 +266,15 @@ void op_mode_auto(MAIN_STATE *state)
         if (!BK20) break;
         stop();
         state->oper = o_inj_pop;
+        clr_scale_timer(TMR_SCALE_D1);
         break;
 
     case o_inj_pop:
         f_inj_pop = workset.inj_pop;
         if (f_inj_pop)
         {
-            state->status = s_inj_pop;
-            set_hydro(workset.hyd_U13);
+            state->stat[1] = s_inj_pop;
+            set_hydro_u(workset.hyd_U13);
             EM6(ON);
             EM16(ON);
             EM1(ON);
@@ -251,10 +284,11 @@ void op_mode_auto(MAIN_STATE *state)
             stop();
         }
         state->oper = o_cooling;
+        run_scale_timer(TMR_SCALE_D1, false);
         break;
 
     case o_cooling:
-        state->status = s_cooling;
+        state->stat[1] = s_none;
         if (get_timer(TMR_5) > 0) break;
         if (workset.p_s)
         {
@@ -263,11 +297,14 @@ void op_mode_auto(MAIN_STATE *state)
             set_timer(TMR_17, (uint32_t)(workset.tmr_T17) * 10);
         }
         state->oper = o_disjunction_break;
+        run_scale_timer(TMR_SCALE_D2, false);
+        clr_scale_timer(TMR_SCALE_D1);
+        run_scale_timer(TMR_SCALE_D1, true);
         break;
 
     case o_disjunction_break:
-        state->status = s_disjunction_break;
-        set_hydro(workset.hyd_U14);
+        state->stat[1] = s_disjunction_break;
+        set_hydro_u(workset.hyd_U14);
         EM4(ON);
         EM16(ON);
         EM1(ON);
@@ -275,21 +312,23 @@ void op_mode_auto(MAIN_STATE *state)
         if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK3) break;
         state->oper = o_disjunction_fast;
+        clr_scale_timer(TMR_SCALE_D1);
         break;
 
     case o_disjunction_fast:
-        state->status = s_disjunction_fast;
-        set_hydro(workset.hyd_U12);
+        state->stat[1] = s_disjunction_fast;
+        set_hydro_u(workset.hyd_U12);
         if (!BK20) BREAK_ERR(e_err_bk20);
         if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK51) break;
         state->oper = o_disjunction_slow;
         set_timer(TMR_8, (uint32_t)(workset.tmr_T08) * 10);
+        clr_scale_timer(TMR_SCALE_D1);
         break;
 
     case o_disjunction_slow:
-        state->status = s_disjunction_slow;
-        set_hydro(workset.hyd_U05);
+        state->stat[1] = s_disjunction_slow;
+        set_hydro_u(workset.hyd_U05);
         if (!BK20) BREAK_ERR(e_err_bk20);
         if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (get_timer(TMR_8) < 0) BREAK_ERR(e_err_tmr8);
@@ -298,26 +337,32 @@ void op_mode_auto(MAIN_STATE *state)
         state->flags.f.cycle_report = true;
         state->oper = o_pause;
         if (workset.jump) state->oper = o_jump;
+        clr_scale_timer(TMR_SCALE_D1);
         break;
 
     case o_jump:
-        state->status = s_jump;
-        set_hydro(workset.hyd_U16);
+        state->stat[1] = s_jump;
+        set_hydro_u(workset.hyd_U16);
         EM3(ON);
         if (!BK20) BREAK_ERR(e_err_bk20);
         if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (!BK53) break;
-        set_hydro(0);
+        set_hydro_u(0);
         state->oper = o_pause;
-        set_timer(TMR_9, (uint32_t)(workset.tmr_T09) * 10);
         break;
 
     case o_pause:
-        state->status = s_done;
+        if (state->stat[1] != s_pause)
+        {
+            state->stat[1] = s_pause;
+            run_scale_timer(TMR_SCALE_D0, false);
+            run_scale_timer(TMR_SCALE_D1, false);
+            kill_timer(TMR_1);
+            set_timer(TMR_9, (uint32_t)(workset.tmr_T09) * 10);
+        }
         EM3(OFF);
         EM16(OFF);
         EM1(OFF);
-        if (get_timer(TMR_1) > 0) kill_timer(TMR_1);
         if (!BK20) BREAK_ERR(e_err_bk20);
         if (f_inj_pop && !BK21) BREAK_ERR(e_err_bk21);
         if (get_timer(TMR_9) > 0) break;
