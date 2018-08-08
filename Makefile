@@ -9,8 +9,13 @@ TARGET = fo1400
 SRCDIR = src
 BUILDDIR = build
 
+ifdef SYSTEMROOT
+CC = c:\m32c-elf\bin\m32c-elf-gcc.exe
+OC = c:\m32c-elf\bin\m32c-elf-objcopy.exe
+else
 CC = wine "c:\m32c-elf\bin\m32c-elf-gcc.exe"
 OC = wine "c:\m32c-elf\bin\m32c-elf-objcopy.exe"
+endif
 
 CFLAGS = -mcpu=m32c -std=gnu99 -Wall -Wno-unused
 LDFLAGS = -T m32c84.ld -Wl,-Map=$(BUILDDIR)/$(TARGET).map -fstack-check
